@@ -2,13 +2,18 @@ name: Veri güncelleme
 
 # Uçak ve uydu anlık görüntülerini "data" dalına yazar.
 # Pages sürümü bu dosyaları raw.githubusercontent.com üzerinden okur.
+#
+# Her çalışma bitince ~4 dk bekleyip bir sonrakini kendisi başlatır (kendini yenileyen zincir),
+# böylece veri ~5 dakikada bir tazelenir. GitHub zamanlayıcısı yalnızca yedektir:
+# zincir koparsa ilk fırsatta yeniden başlatır.
 on:
   schedule:
-    - cron: '*/10 * * * *'
+    - cron: '7,22,37,52 * * * *'
   workflow_dispatch:
 
 permissions:
   contents: write
+  actions: write
 
 concurrency:
   group: data
@@ -17,7 +22,7 @@ concurrency:
 jobs:
   update:
     runs-on: ubuntu-latest
-    timeout-minutes: 8
+    timeout-minutes: 10
     steps:
       - uses: actions/checkout@v4
       - uses: actions/setup-node@v4
@@ -47,3 +52,11 @@ jobs:
           git -c user.name="Berkant Kul" -c user.email="98064889+berkantkull@users.noreply.github.com" \
             commit -q -m "Veri güncellemesi $(date -u +%Y-%m-%dT%H:%MZ)"
           git push -q -f "https://x-access-token:${TOKEN}@github.com/${GITHUB_REPOSITORY}.git" data
+
+      - name: Sonraki güncellemeyi başlat
+        if: always()
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          sleep 240
+          gh workflow run data.yml --ref main -R "$GITHUB_REPOSITORY"

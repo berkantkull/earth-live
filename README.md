@@ -17,11 +17,12 @@ Gerçek Dünya gözlem verilerini fotogerçekçi bir 3B gezegen üzerinde göste
 | --- | --- | --- |
 | Depremler, arama | Node sunucusu üzerinden, önbellekli | Tarayıcıdan doğrudan (CORS açık) |
 | Uydular | Sunucu, disk önbelleği | `data` dalındaki anlık görüntü, yoksa doğrudan CelesTrak |
-| Uçaklar | Sunucu, OpenSky | `data` dalındaki anlık görüntü (~10 dk'da bir) |
+| Uçaklar | Sunucu, OpenSky | `data` dalındaki anlık görüntü (~5 dk'da bir) |
 
 OpenSky tarayıcıdan doğrudan erişime izin vermediği için Pages sürümünde uçak ve uydu verisi
-`.github/workflows/data.yml` iş akışıyla 10 dakikada bir toplanır ve `data` dalına tek commit olarak yazılır
-(geçmiş birikmez). Arayüz bu dosyaları `raw.githubusercontent.com` üzerinden okur.
+`.github/workflows/data.yml` iş akışıyla yaklaşık 5 dakikada bir toplanır ve `data` dalına tek commit olarak
+yazılır (geçmiş birikmez). İş akışı her çalışmanın sonunda bir sonrakini kendisi başlatır; GitHub zamanlayıcısı
+zincir koparsa yeniden başlatan bir yedektir. Arayüz bu dosyaları `raw.githubusercontent.com` üzerinden okur.
 
 ## Geliştirme
 

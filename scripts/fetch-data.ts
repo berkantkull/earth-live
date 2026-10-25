@@ -23,8 +23,8 @@ if (!out) {
 }
 await mkdir(out, { recursive: true });
 
-/** Actions zamanlayıcısı ~10 dakikada bir çalışır */
-const AIRCRAFT_INTERVAL_S = 10 * 60;
+/** Kendini yenileyen iş akışı zinciri ~5 dakikada bir çalışır */
+const AIRCRAFT_INTERVAL_S = 5 * 60;
 
 async function readJson<T>(file: string): Promise<T | null> {
   try {
