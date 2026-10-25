@@ -310,7 +310,31 @@ $<HTMLInputElement>('opt-lighting').addEventListener('change', (e) => globe.setR
 $<HTMLInputElement>('opt-clouds').addEventListener('change', (e) => globe.setCloudsVisible((e.target as HTMLInputElement).checked));
 $<HTMLInputElement>('opt-atmosphere').addEventListener('change', (e) => globe.setAtmosphereVisible((e.target as HTMLInputElement).checked));
 
-$('toggle-layers').addEventListener('click', () => $('layers-panel').classList.toggle('open'));
+// Katmanlar paneli: geniş ekranda varsayılan açık (gizlenebilir), dar ekranda varsayılan kapalı (açılabilir)
+const layersPanel = $('layers-panel');
+const layersBtn = $('toggle-layers');
+const narrowScreen = matchMedia('(max-width: 860px)');
+const layersVisible = () =>
+  narrowScreen.matches ? layersPanel.classList.contains('open') : !layersPanel.classList.contains('collapsed');
+function syncLayersButton() {
+  const open = layersVisible();
+  const label = open ? 'Katmanlar panelini gizle' : 'Katmanlar panelini göster';
+  layersBtn.setAttribute('aria-expanded', String(open));
+  layersBtn.setAttribute('aria-label', label);
+  layersBtn.title = label;
+}
+function setLayersVisible(open: boolean) {
+  if (narrowScreen.matches) layersPanel.classList.toggle('open', open);
+  else layersPanel.classList.toggle('collapsed', !open);
+  syncLayersButton();
+}
+layersBtn.addEventListener('click', () => setLayersVisible(!layersVisible()));
+narrowScreen.addEventListener('change', syncLayersButton);
+// dar ekranda Dünya'ya dokununca panel kapanır, gezegen görünür
+container.addEventListener('pointerdown', () => {
+  if (narrowScreen.matches && layersVisible()) setLayersVisible(false);
+});
+syncLayersButton();
 
 renderLegend($('legend'));
 $('copyright-year').textContent = String(Math.max(2026, new Date().getFullYear()));
