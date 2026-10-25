@@ -51,7 +51,13 @@ jobs:
           git add -A
           git -c user.name="Berkant Kul" -c user.email="98064889+berkantkull@users.noreply.github.com" \
             commit -q -m "Veri güncellemesi $(date -u +%Y-%m-%dT%H:%MZ)"
-          git push -q -f "https://x-access-token:${TOKEN}@github.com/${GITHUB_REPOSITORY}.git" data
+          # GitHub'da ref güncellemesi nadiren geçici olarak reddedilir ("cannot lock ref"): yeniden dene
+          for i in 1 2 3 4; do
+            git push -q -f "https://x-access-token:${TOKEN}@github.com/${GITHUB_REPOSITORY}.git" data && exit 0
+            echo "push denemesi $i başarısız, tekrar deneniyor"
+            sleep $((i * 5))
+          done
+          exit 1
 
       - name: Sonraki güncellemeyi başlat
         if: always()
