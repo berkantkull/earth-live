@@ -8,6 +8,8 @@ Gerçek Dünya gözlem verilerini fotogerçekçi bir 3B gezegen üzerinde göste
 - **Uçaklar** — OpenSky Network ADS-B durum vektörleri (~12 bin uçak). Konumlar, ölçüm anından itibaren hız ve rota ile ileri tahmin edilir (dead reckoning); veri yenilemeleri arasında uçaklar akıcı hareket eder.
 - **Uydular** — CelesTrak GP/TLE verisi; yörüngeler tarayıcıda, ayrı bir Web Worker içinde SGP4 ile hesaplanır. Seçilen uydu için bir periyotluk yörünge izi, canlı irtifa/hız/alt-uydu noktası ve yörünge elemanları gösterilir. CelesTrak bir grubu veremezse "tüm aktif uydular" için SatNOGS DB yedek kaynak olarak kullanılır.
 - **Şehir arama** — Open-Meteo Geocoding (GeoNames); kamera konuma uçar, yerel saat ve güneş yüksekliği gösterilir.
+- **Uydu geçiş tahmini** — Seçilen uydunun aranan şehir ya da cihaz konumu üzerinden önümüzdeki geçişleri: saat, en yüksek açı, doğuş/batış yönü ve çıplak gözle görünürlük (gökyüzü karanlık ve uydu Güneş ışığı alıyorsa).
+- **Paylaşılabilir bağlantılar** — Kamera, seçili nesne ve filtreler adres çubuğunda tutulur (`#c=…&s=…`); bağlantıyı açan kişi aynı görünümü görür. Bağlantı paylaşıldığında önizleme kartı çıkar.
 - **Gerçek aydınlatma** — Güneş-altı noktası astronomik formüllerle hesaplanır; gece/gündüz sınırı, şehir ışıkları, okyanus parlaması, bulut gölgeleri ve atmosfer gerçek zamana göre çizilir.
 - **Veri kaynakları paneli** — her kaynağın durumu, son güncelleme, sonraki yenileme, öğe sayısı ve hata mesajları.
 

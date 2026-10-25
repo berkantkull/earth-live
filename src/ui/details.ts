@@ -2,6 +2,7 @@ import type { SatRec } from '../lib/sgp4.ts';
 import { formatLat, formatLon } from '../lib/geo.ts';
 import { compass, escapeHtml, localString, num, relativeTime, utcString } from '../lib/format.ts';
 import { orbitalElements, satelliteState } from '../lib/orbits.ts';
+import type { Observer, Pass } from '../lib/passes.ts';
 import { ALTITUDE_STOPS, DEPTH_STOPS, ORBIT_COLORS, stopColor } from '../lib/scales.ts';
 import type { Aircraft, Earthquake, GeocodeResult, SatelliteTle } from '../lib/types.ts';
 
@@ -138,6 +139,7 @@ export function renderSatellite(tle: SatelliteTle, rec: SatRec | null): string {
       ${cell('Günlük tur', num(1440 / el.periodMin, 2))}
       ${cell('TLE epoch', `${utcString(el.epoch.getTime())} (${relativeTime(el.epoch.getTime())})`, true)}
     </dl>
+    <div id="passes"></div>
     <div class="d-section">İki satırlı element seti (TLE)</div>
     <div class="d-tle">${escapeHtml(tle.line1)}\n${escapeHtml(tle.line2)}</div>
     <div class="d-actions" style="margin-top:12px">
@@ -187,4 +189,52 @@ export function renderPlace(p: GeocodeResult, sun: { lat: number; lon: number })
     </dl>
     <div class="d-source">Kaynak: Open-Meteo Geocoding API (GeoNames)</div>
   `;
+}
+
+// ---------------------------------------------------------------- geçiş tahmini
+
+const timeFmt = new Intl.DateTimeFormat('tr-TR', { hour: '2-digit', minute: '2-digit' });
+const dayFmt = new Intl.DateTimeFormat('tr-TR', { weekday: 'short', day: 'numeric', month: 'short' });
+
+export function renderPasses(obs: Observer | null, passes: Pass[] | null, orbitClass: string): string {
+  const head = '<div class="d-section">Gökyüzünden görünüm</div>';
+  if (orbitClass === 'GEO') {
+    return `${head}<p class="d-note">Yer eşzamanlı uydular Dünya ile birlikte döner; gökyüzünde hep aynı noktada durur, "geçiş" yapmaz.</p>`;
+  }
+  if (!obs) {
+    return `${head}
+      <p class="d-note">Bu uydunun bulunduğunuz yerin üzerinden ne zaman geçeceğini ve çıplak gözle görünüp görünmeyeceğini hesaplayalım.</p>
+      <div class="d-actions"><button class="btn primary" data-action="locate">Konumumu kullan</button></div>
+      <p class="d-note muted">ya da yukarıdan bir şehir arayın.</p>`;
+  }
+  const where = `<p class="d-note">Gözlem yeri: <strong>${escapeHtml(obs.name)}</strong> · <button class="link-btn" data-action="locate">konumumu kullan</button></p>`;
+  if (!passes || passes.length === 0) {
+    return `${head}${where}<p class="d-note">Önümüzdeki 3 gün içinde ufkun 10° üstüne çıkan bir geçiş yok.</p>`;
+  }
+  const nextVisible = passes.find((p) => p.visible);
+  const hero = nextVisible
+    ? `<div class="pass-hero">
+        <span class="tag ok">ÇIPLAK GÖZLE GÖRÜNÜR</span>
+        <strong>${dayFmt.format(nextVisible.max)} · ${timeFmt.format(nextVisible.start)}</strong>
+        <span>${compass(nextVisible.startAzimuthDeg)} yönünden doğar, en fazla <b>${num(nextVisible.maxElevationDeg)}°</b> yükselir,
+        ${compass(nextVisible.endAzimuthDeg)} yönünde kaybolur · ${num((nextVisible.end - nextVisible.start) / 60000)} dk</span>
+      </div>`
+    : '<p class="d-note">Aşağıdaki geçişlerin hiçbiri çıplak gözle görülemiyor (uydu ya gündüz geçiyor ya da Dünya\'nın gölgesinde kalıyor).</p>';
+  const rows = passes
+    .map(
+      (p) => `<tr class="${p.visible ? 'vis' : ''}">
+        <td>${dayFmt.format(p.start)}</td>
+        <td>${timeFmt.format(p.start)}–${timeFmt.format(p.end)}</td>
+        <td>${num(p.maxElevationDeg)}°</td>
+        <td>${compass(p.startAzimuthDeg)}→${compass(p.endAzimuthDeg)}</td>
+        <td>${p.visible ? '●' : ''}</td>
+      </tr>`,
+    )
+    .join('');
+  return `${head}${where}${hero}
+    <table class="pass-table">
+      <thead><tr><th>Gün</th><th>Saat</th><th>Tepe</th><th>Yön</th><th title="Çıplak gözle görünür">👁</th></tr></thead>
+      <tbody>${rows}</tbody>
+    </table>
+    <p class="d-note muted">Saatler cihazınızın saat diliminde. Görünürlük: gökyüzü karanlık ve uydu Güneş ışığı alıyor.</p>`;
 }

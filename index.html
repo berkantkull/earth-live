@@ -8,6 +8,23 @@
     <meta name="author" content="Berkant Kul" />
     <title>EARTH LIVE — Global Observation & Monitoring System</title>
     <link rel="icon" type="image/svg+xml" href="/favicon.svg" />
+    <link rel="canonical" href="%VITE_SITE_URL%" />
+
+    <!-- bağlantı paylaşıldığında görünen önizleme kartı -->
+    <meta property="og:type" content="website" />
+    <meta property="og:site_name" content="EARTH LIVE" />
+    <meta property="og:locale" content="tr_TR" />
+    <meta property="og:url" content="%VITE_SITE_URL%" />
+    <meta property="og:title" content="EARTH LIVE — Dünya'yı canlı izle" />
+    <meta property="og:description" content="Depremleri, binlerce uçağı ve uyduyu gerçek zamanlı olarak 3B bir gezegen üzerinde izleyin. Uyduların ne zaman tepenizden geçeceğini öğrenin." />
+    <meta property="og:image" content="%VITE_SITE_URL%og-image.jpg" />
+    <meta property="og:image:width" content="1200" />
+    <meta property="og:image:height" content="630" />
+    <meta property="og:image:alt" content="Uydularla çevrili 3B Dünya ve EARTH LIVE başlığı" />
+    <meta name="twitter:card" content="summary_large_image" />
+    <meta name="twitter:title" content="EARTH LIVE — Dünya'yı canlı izle" />
+    <meta name="twitter:description" content="Depremler, uçaklar ve uydular — gerçek zamanlı, 3B gezegen üzerinde." />
+    <meta name="twitter:image" content="%VITE_SITE_URL%og-image.jpg" />
     <link rel="preconnect" href="https://fonts.googleapis.com" />
     <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
     <!-- fontlar sayfanın çizilmesini engellemez; gelene kadar sistem fontu kullanılır -->
@@ -54,6 +71,9 @@
         </div>
 
         <div class="topbar-right">
+          <button class="icon-btn" id="share-view" aria-label="Bu görünümü paylaş" title="Bu görünümü paylaş">
+            <svg viewBox="0 0 24 24"><circle cx="18" cy="5" r="2.5" /><circle cx="6" cy="12" r="2.5" /><circle cx="18" cy="19" r="2.5" /><path d="m8.2 10.8 7.6-4.5M8.2 13.2l7.6 4.5" /></svg>
+          </button>
           <button class="icon-btn mobile-only" id="toggle-layers" aria-label="Katmanlar">
             <svg viewBox="0 0 24 24"><path d="m12 3 9 5-9 5-9-5 9-5Z" /><path d="m3 13 9 5 9-5" /></svg>
           </button>
@@ -141,6 +161,9 @@
       </aside>
 
       <aside class="panel details-panel" id="details-panel" aria-live="polite" hidden>
+        <button class="close-btn share" id="details-share" aria-label="Paylaş" title="Bağlantıyı paylaş">
+          <svg viewBox="0 0 24 24"><circle cx="18" cy="5" r="2.5" /><circle cx="6" cy="12" r="2.5" /><circle cx="18" cy="19" r="2.5" /><path d="m8.2 10.8 7.6-4.5M8.2 13.2l7.6 4.5" /></svg>
+        </button>
         <button class="close-btn" id="details-close" aria-label="Kapat">
           <svg viewBox="0 0 24 24"><path d="M6 6l12 12M18 6 6 18" /></svg>
         </button>

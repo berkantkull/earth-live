@@ -8,6 +8,7 @@ import type { Layer, LayerId } from './layers/Layer.ts';
 import { SatelliteLayer } from './layers/SatelliteLayer.ts';
 import { EARTH_RADIUS_KM, formatLat, formatLon, isOccludedByEarth, latLonToVec3, vec3ToLatLon } from './lib/geo.ts';
 import { num, relativeTime } from './lib/format.ts';
+import { predictPasses, type Observer, type Pass } from './lib/passes.ts';
 import {
   QUAKE_FEEDS,
   SATELLITE_GROUPS,
@@ -18,6 +19,7 @@ import {
 import {
   renderAircraft,
   renderEarthquake,
+  renderPasses,
   renderPlace,
   renderSatellite,
   updateSatelliteLive,
@@ -30,6 +32,7 @@ import {
   setLegendVisible,
   toast,
 } from './ui/panels.ts';
+import { buildViewHash, parseViewState, type SharedSelection, type ViewState } from './ui/urlState.ts';
 
 const $ = <T extends HTMLElement = HTMLElement>(id: string) => document.getElementById(id) as T;
 
@@ -99,6 +102,21 @@ for (const [k, v] of Object.entries(QUAKE_FEEDS)) quakeFeedSel.add(new Option(v,
 const satGroupSel = $<HTMLSelectElement>('sat-group');
 for (const [k, v] of Object.entries(SATELLITE_GROUPS)) satGroupSel.add(new Option(v, k, k === 'active', k === 'active'));
 
+// ---------------------------------------------------------------- paylaşılan bağlantı (#...)
+const initialView = parseViewState(location.hash);
+if (initialView.feed) quakeFeedSel.value = initialView.feed;
+if (initialView.group) satGroupSel.value = initialView.group;
+if (initialView.camera) {
+  const { lat, lon, altKm } = initialView.camera;
+  const p = latLonToVec3(lat, lon, Math.max(1.09, 1 + altKm / EARTH_RADIUS_KM));
+  globe.camera.position.set(p.x, p.y, p.z);
+  globe.pauseAutoRotate(20000);
+}
+/** bağlantıdaki seçim, ilgili veri gelince uygulanır */
+let pendingShared: SharedSelection | null = initialView.selection ?? null;
+/** seçilen nesnenin konumu hesaplanınca kamerayı oraya götür */
+let pendingFly = false;
+
 function failed(id: LayerId, err: Error) {
   state[id].loading = false;
   state[id].error = err.message;
@@ -110,6 +128,24 @@ function received(id: LayerId, meta: SourceMetaDto) {
   Object.assign(state[id], { meta, loading: false, error: null, receivedAt: Date.now() });
   updateLayerStatus();
   if (selection?.kind === 'layer' && selection.layer === id) refreshSelection();
+  resolvePendingShared(id);
+}
+
+function resolvePendingShared(id: LayerId) {
+  if (!pendingShared || pendingShared.kind !== 'layer' || pendingShared.layer !== id) return;
+  const idx = layers[id].indexOfKey(pendingShared.key);
+  pendingShared = null;
+  if (idx < 0) {
+    const what = {
+      earthquakes: 'deprem seçili zaman aralığında',
+      aircraft: 'uçak şu an yayında (inmiş olabilir)',
+      satellites: 'uydu bu grupta',
+    }[id];
+    toast($('toasts'), `Paylaşılan ${what} bulunamadı.`, 'info');
+    return;
+  }
+  selectLayerItem(id, idx);
+  if (!initialView.camera) pendingFly = true;
 }
 
 const quakePoller = new Poller(
@@ -252,6 +288,10 @@ quakeMin.addEventListener('input', () => {
   quakes.setFilter({ minMagnitude: Number(quakeMin.value) });
   updateLayerStatus();
 });
+if (initialView.minMagnitude) {
+  quakeMin.value = String(initialView.minMagnitude);
+  quakeMin.dispatchEvent(new Event('input'));
+}
 $<HTMLInputElement>('aircraft-ground').addEventListener('change', (e) => {
   aircraft.setFilter({ showOnGround: (e.target as HTMLInputElement).checked });
   updateLayerStatus();
@@ -434,22 +474,142 @@ function refreshSelection() {
   else if (id === 'aircraft') {
     const a = aircraft.item(idx)!;
     detailsContent.innerHTML = renderAircraft(a, aircraft.estimate(a, Date.now()), aircraftObservedAt);
-  } else detailsContent.innerHTML = renderSatellite(satellites.item(idx)!, satellites.satrec(idx));
+  } else {
+    detailsContent.innerHTML = renderSatellite(satellites.item(idx)!, satellites.satrec(idx));
+    renderPassSection();
+  }
   details.hidden = false;
 }
 
 $('details-close').addEventListener('click', clearSelection);
-detailsContent.addEventListener('click', (e) => {
-  const btn = (e.target as HTMLElement).closest<HTMLElement>('[data-action="fly"]');
-  if (!btn || !selection || selection.kind !== 'layer') return;
+/** Kamerayı seçili nesneye götürür; uçak ve uydularda varınca takibe geçer */
+function flyToSelection(follow: boolean): boolean {
+  if (!selection || selection.kind !== 'layer') return false;
   const idx = layers[selection.layer].indexOfKey(selection.key);
-  if (idx < 0 || !layers[selection.layer].positionOf(idx, tmp)) return;
+  if (idx < 0 || !layers[selection.layer].positionOf(idx, tmp)) return false;
   const ll = vec3ToLatLon(tmp);
   const dist = selection.layer === 'satellites' ? Math.max(ll.radius + 0.8, 1.6) : 1.45;
   globe.flyTo(ll.lat, ll.lon, dist);
-  following = selection.layer !== 'earthquakes';
-  if (following) setTimeout(() => (following = selection !== null && following), 1900);
+  following = false;
+  if (follow && selection.layer !== 'earthquakes') {
+    const target = selection.key;
+    setTimeout(() => {
+      following = selection?.kind === 'layer' && selection.key === target;
+    }, 1900);
+  }
+  return true;
+}
+
+detailsContent.addEventListener('click', (e) => {
+  const btn = (e.target as HTMLElement).closest<HTMLElement>('[data-action]');
+  if (!btn) return;
+  if (btn.dataset.action === 'fly') flyToSelection(true);
+  else if (btn.dataset.action === 'locate') locateObserver();
 });
+
+// ---------------------------------------------------------------- gözlemci konumu ve geçiş tahmini
+const OBSERVER_KEY = 'earthlive.observer';
+let observer: Observer | null = (() => {
+  try {
+    const o = JSON.parse(localStorage.getItem(OBSERVER_KEY) ?? 'null');
+    return o && Number.isFinite(o.lat) && Number.isFinite(o.lon) ? (o as Observer) : null;
+  } catch {
+    return null;
+  }
+})();
+let passCache: { key: string; at: number; passes: Pass[] } | null = null;
+
+function setObserver(o: Observer) {
+  observer = o;
+  passCache = null;
+  try {
+    localStorage.setItem(OBSERVER_KEY, JSON.stringify(o));
+  } catch {
+    // gizli pencere vb. — yalnızca bu oturum için geçerli
+  }
+  renderPassSection();
+}
+
+function locateObserver() {
+  if (!('geolocation' in navigator)) {
+    toast($('toasts'), 'Tarayıcınız konum paylaşmayı desteklemiyor; bir şehir arayabilirsiniz.', 'info');
+    return;
+  }
+  navigator.geolocation.getCurrentPosition(
+    (pos) => {
+      setObserver({ lat: pos.coords.latitude, lon: pos.coords.longitude, elevationM: pos.coords.altitude ?? 0, name: 'Konumunuz' });
+      toast($('toasts'), 'Konumunuz yalnızca bu cihazda, geçiş hesabı için kullanılıyor.', 'info', 4000);
+    },
+    (err) => {
+      const msg = err.code === err.PERMISSION_DENIED ? 'Konum izni verilmedi' : 'Konum alınamadı';
+      toast($('toasts'), `${msg}; bunun yerine yukarıdan bir şehir arayabilirsiniz.`, 'info');
+    },
+    { enableHighAccuracy: false, timeout: 10_000, maximumAge: 600_000 },
+  );
+}
+
+/** Seçili uydu için gözlem yerine göre geçiş listesini çizer (10 dk önbellekli) */
+function renderPassSection() {
+  const el = detailsContent.querySelector<HTMLElement>('#passes');
+  if (!el || selection?.kind !== 'layer' || selection.layer !== 'satellites') return;
+  const idx = satellites.indexOfKey(selection.key);
+  const rec = satellites.satrec(idx);
+  const cls = satellites.orbitClassOf(idx);
+  let passes: Pass[] | null = null;
+  if (observer && rec && cls !== 'GEO') {
+    const key = `${selection.key}|${observer.lat.toFixed(3)},${observer.lon.toFixed(3)}`;
+    if (!passCache || passCache.key !== key || Date.now() - passCache.at > 600_000) {
+      passCache = { key, at: Date.now(), passes: predictPasses(rec, observer, Date.now(), { hours: 72, maxPasses: 8 }) };
+    }
+    passes = passCache.passes;
+  }
+  el.innerHTML = renderPasses(observer, passes, cls);
+}
+
+// ---------------------------------------------------------------- paylaşma
+function currentViewState(): ViewState {
+  const ll = vec3ToLatLon(globe.camera.position);
+  const v: ViewState = {
+    camera: { lat: ll.lat, lon: ll.lon, altKm: (ll.radius - 1) * EARTH_RADIUS_KM },
+    feed: quakeFeedSel.value as ViewState['feed'],
+    group: satGroupSel.value as ViewState['group'],
+    minMagnitude: Number(quakeMin.value),
+  };
+  if (selection?.kind === 'layer') v.selection = { kind: 'layer', layer: selection.layer, key: selection.key };
+  else if (selection?.kind === 'place') {
+    v.selection = { kind: 'place', lat: selection.place.lat, lon: selection.place.lon, name: selection.place.name };
+  } else if (pendingShared) v.selection = pendingShared;
+  return v;
+}
+
+function writeUrl() {
+  const hash = buildViewHash(currentViewState());
+  if (hash !== location.hash) history.replaceState(null, '', hash || location.pathname + location.search);
+}
+
+async function shareCurrentView() {
+  writeUrl();
+  const url = location.href;
+  const sel = selection?.kind === 'layer' ? selection : null;
+  const label = sel ? layers[sel.layer].label(layers[sel.layer].indexOfKey(sel.key)) : null;
+  const text = label ? `EARTH LIVE'da şuna bak: ${label}` : "EARTH LIVE'da Dünya'yı canlı izle";
+  if (navigator.share && matchMedia('(pointer: coarse)').matches) {
+    try {
+      await navigator.share({ title: 'EARTH LIVE', text, url });
+      return;
+    } catch (err) {
+      if ((err as Error).name === 'AbortError') return;
+    }
+  }
+  try {
+    await navigator.clipboard.writeText(url);
+    toast($('toasts'), 'Bağlantı kopyalandı — açan kişi tam olarak bu görünümü görecek.', 'info', 4000);
+  } catch {
+    toast($('toasts'), `Bağlantı: ${url}`, 'info', 12000);
+  }
+}
+$('share-view').addEventListener('click', () => void shareCurrentView());
+$('details-share').addEventListener('click', () => void shareCurrentView());
 
 // ---------------------------------------------------------------- arama
 const searchInput = $<HTMLInputElement>('search-input');
@@ -535,13 +695,15 @@ function removePlaceMarker() {
   placeMarker = null;
 }
 
-function choosePlace(p: GeocodeResult | undefined) {
+function choosePlace(p: GeocodeResult | undefined, fly = true) {
   if (!p) return;
   closeResults();
   searchInput.value = p.name;
   searchInput.blur();
   clearSelection();
-  globe.flyTo(p.lat, p.lon, 1.55);
+  if (fly) globe.flyTo(p.lat, p.lon, 1.55);
+  // aranan yer, uydu geçiş tahminlerinde gözlem noktası olur
+  setObserver({ lat: p.lat, lon: p.lon, elevationM: p.elevation ?? 0, name: p.name });
 
   const g = new THREE.Group();
   const base = new THREE.Vector3().copy(latLonToVec3(p.lat, p.lon, 1.0015) as THREE.Vector3);
@@ -565,6 +727,16 @@ function choosePlace(p: GeocodeResult | undefined) {
   refreshSelection();
 }
 
+if (pendingShared?.kind === 'place') {
+  const s = pendingShared;
+  pendingShared = null;
+  const place: GeocodeResult = {
+    id: 0, name: s.name, lat: s.lat, lon: s.lon,
+    country: null, countryCode: null, admin1: null, population: null, elevation: null, timezone: null,
+  };
+  choosePlace(place, !initialView.camera);
+}
+
 // ---------------------------------------------------------------- kare döngüsü
 let lastSlowTick = 0;
 globe.onFrame((_dt, now) => {
@@ -578,6 +750,10 @@ globe.onFrame((_dt, now) => {
     const layer = layers[selection.layer];
     const idx = layer.indexOfKey(selection.key);
     if (idx >= 0 && layer.positionOf(idx, tmp)) {
+      if (pendingFly) {
+        pendingFly = false;
+        flyToSelection(false);
+      }
       if (following) {
         const d = globe.camera.position.length();
         globe.camera.position.copy(tmp).normalize().multiplyScalar(d);
@@ -609,6 +785,7 @@ function slowTick(now: number) {
   const sun = globe.subsolar;
   $('hud-sun').textContent = `${formatLat(sun.lat, 1)} ${formatLon(sun.lon, 1)}`;
   updateLayerStatus();
+  writeUrl();
 
   if (selection?.kind === 'layer' && selection.layer === 'satellites') {
     const rec = satellites.satrec(satellites.indexOfKey(selection.key));

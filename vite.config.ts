@@ -8,6 +8,9 @@ try {
   // .env opsiyonel
 }
 
+// Paylaşım kartları (og:image vb.) mutlak adres ister; index.html'de %VITE_SITE_URL% olarak kullanılır
+process.env.VITE_SITE_URL ??= 'https://berkantkull.github.io/earth-live/';
+
 export default defineConfig({
   // GitHub Pages: https://<kullanıcı>.github.io/<repo>/ altında yayınlanır
   base: process.env.VITE_BASE ?? '/',
