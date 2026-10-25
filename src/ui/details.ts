@@ -3,7 +3,7 @@ import { formatLat, formatLon } from '../lib/geo.ts';
 import { compass, escapeHtml, localString, num, relativeTime, utcString } from '../lib/format.ts';
 import { orbitalElements, satelliteState } from '../lib/orbits.ts';
 import type { Observer, Pass } from '../lib/passes.ts';
-import { ALTITUDE_STOPS, DEPTH_STOPS, ORBIT_COLORS, stopColor } from '../lib/scales.ts';
+import { ALTITUDE_STOPS, DEPTH_STOPS, ORBIT_COLORS, PLATE_COLORS, stopColor } from '../lib/scales.ts';
 import type { Aircraft, Earthquake, GeocodeResult, SatelliteTle } from '../lib/types.ts';
 
 const cell = (label: string, value: string, wide = false) =>
@@ -237,4 +237,41 @@ export function renderPasses(obs: Observer | null, passes: Pass[] | null, orbitC
       <tbody>${rows}</tbody>
     </table>
     <p class="d-note muted">Saatler cihazınızın saat diliminde. Görünürlük: gökyüzü karanlık ve uydu Güneş ışığı alıyor.</p>`;
+}
+
+// ---------------------------------------------------------------- tektonik plaka sınırı
+
+export interface PlateBoundaryInfo {
+  title: string;
+  subduction: boolean;
+  source: string;
+  lengthKm: number;
+  nearbyQuakes: number;
+  strongest: { magnitude: number; place: string } | null;
+  feedLabel: string;
+  minMagnitude: number;
+}
+
+export function renderPlateBoundary(p: PlateBoundaryInfo): string {
+  const color = p.subduction ? PLATE_COLORS.subduction : PLATE_COLORS.boundary;
+  const kind = p.subduction
+    ? 'Dalma-batma zonu: plakalardan biri diğerinin altına dalarak mantoya iniyor. Dünyadaki en büyük depremlerin ve volkanların çoğu bu kuşaklarda oluşur.'
+    : 'Plakaların yan yana kaydığı (yanal atımlı fay), birbirinden uzaklaştığı (okyanus ortası sırtı) ya da çarpıştığı bir sınır.';
+  const filter = p.minMagnitude > 0 ? `, M${p.minMagnitude.toFixed(1)}+` : '';
+  return `
+    <div class="d-kind" style="color:${color}"><i style="background:${color}"></i>Tektonik plaka sınırı</div>
+    <h2 class="d-title">${escapeHtml(p.title)}</h2>
+    <div class="d-sub">${p.subduction ? 'Dalma-batma zonu' : 'Plaka sınırı'}</div>
+    <p class="d-note">${kind}</p>
+    <div class="d-hero"><span class="big">${num(p.nearbyQuakes)}</span><span class="unit">deprem, sınıra 100 km içinde</span></div>
+    <dl class="d-grid">
+      ${cell('Sınır uzunluğu', `${num(p.lengthKm)} km`)}
+      ${cell('Tür', p.subduction ? 'Dalma-batma' : 'Diğer')}
+      ${cell('Yakın depremler', `${num(p.nearbyQuakes)} · ${escapeHtml(p.feedLabel)}${filter}`, true)}
+      ${cell('En büyüğü', p.strongest ? `M${p.strongest.magnitude.toFixed(1)} · ${escapeHtml(p.strongest.place)}` : '—', true)}
+      ${cell('Sınırı tanımlayan çalışma', escapeHtml(p.source || '—'), true)}
+    </dl>
+    <div class="d-actions"><button class="btn" data-action="fly">Sınıra git</button></div>
+    <div class="d-source">Kaynak: Bird, P. (2003) "An updated digital model of plate boundaries", Geochemistry, Geophysics, Geosystems 4(3) — PB2002 modeli (ODC-By 1.0).</div>
+  `;
 }

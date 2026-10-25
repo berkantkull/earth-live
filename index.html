@@ -59,10 +59,10 @@
           <input
             id="search-input"
             type="search"
-            placeholder="Şehir veya yer ara…"
+            placeholder="Şehir, uçuş (THY) veya uydu (ISS) ara…"
             autocomplete="off"
             spellcheck="false"
-            aria-label="Şehir ara"
+            aria-label="Şehir, uçuş veya uydu ara"
             aria-controls="search-results"
             aria-expanded="false"
           />
@@ -149,6 +149,19 @@
             </label>
           </div>
           <footer class="layer-status" id="status-satellites">Bekleniyor…</footer>
+        </section>
+
+        <section class="layer-card" data-layer="plates">
+          <header>
+            <span class="layer-icon plates" aria-hidden="true"></span>
+            <div class="layer-name">
+              <strong>Tektonik plakalar</strong>
+              <small>PB2002 · Bird (2003)</small>
+            </div>
+            <span class="layer-count" id="count-plates">—</span>
+            <label class="switch"><input type="checkbox" id="toggle-plates" checked /><span></span><em class="sr">Tektonik plakalar</em></label>
+          </header>
+          <footer class="layer-status" id="status-plates">Bekleniyor…</footer>
         </section>
 
         <div class="panel-heading">Görünüm</div>

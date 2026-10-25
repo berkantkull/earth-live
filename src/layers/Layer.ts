@@ -1,6 +1,6 @@
 import type * as THREE from 'three';
 
-export type LayerId = 'earthquakes' | 'aircraft' | 'satellites';
+export type LayerId = 'earthquakes' | 'aircraft' | 'satellites' | 'plates';
 
 /** Ekran-uzayı seçim (picking) ve detay paneli için ortak katman arayüzü. */
 export interface Layer {

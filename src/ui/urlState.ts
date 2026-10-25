@@ -4,7 +4,7 @@
  *   #c=41.01,28.98,3500&s=a:4b1805&f=2.5_week&g=stations&m=4
  *
  *   c  kamera: enlem, boylam, irtifa (km)
- *   s  seçim: q:<deprem kimliği> · a:<uçak icao24> · u:<uydu NORAD> · p:<enlem>,<boylam>,<ad>
+ *   s  seçim: q:<deprem kimliği> · a:<uçak icao24> · u:<uydu NORAD> · t:<plaka sınırı no> · p:<enlem>,<boylam>,<ad>
  *   f  deprem akışı · g  uydu grubu · m  en küçük büyüklük
  */
 import type { LayerId } from '../layers/Layer.ts';
@@ -25,8 +25,8 @@ export interface ViewState {
 export const DEFAULT_FEED: QuakeFeed = 'all_day';
 export const DEFAULT_GROUP: SatelliteGroup = 'active';
 
-const LAYER_CODE: Record<LayerId, string> = { earthquakes: 'q', aircraft: 'a', satellites: 'u' };
-const CODE_LAYER: Record<string, LayerId> = { q: 'earthquakes', a: 'aircraft', u: 'satellites' };
+const LAYER_CODE: Record<LayerId, string> = { earthquakes: 'q', aircraft: 'a', satellites: 'u', plates: 't' };
+const CODE_LAYER: Record<string, LayerId> = { q: 'earthquakes', a: 'aircraft', u: 'satellites', t: 'plates' };
 
 const finite = (...n: number[]) => n.every(Number.isFinite);
 

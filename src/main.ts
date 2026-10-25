@@ -5,10 +5,13 @@ import { Globe } from './globe/Globe.ts';
 import { AircraftLayer } from './layers/AircraftLayer.ts';
 import { EarthquakeLayer } from './layers/EarthquakeLayer.ts';
 import type { Layer, LayerId } from './layers/Layer.ts';
+import { PlateLayer } from './layers/PlateLayer.ts';
 import { SatelliteLayer } from './layers/SatelliteLayer.ts';
 import { EARTH_RADIUS_KM, formatLat, formatLon, isOccludedByEarth, latLonToVec3, vec3ToLatLon } from './lib/geo.ts';
 import { num, relativeTime } from './lib/format.ts';
 import { predictPasses, type Observer, type Pass } from './lib/passes.ts';
+import { boundaryLengthKm, distanceToBoundaryKm, type PlateData } from './lib/plates.ts';
+import { matchAircraft, matchSatellites } from './lib/search.ts';
 import {
   QUAKE_FEEDS,
   SATELLITE_GROUPS,
@@ -21,8 +24,10 @@ import {
   renderEarthquake,
   renderPasses,
   renderPlace,
+  renderPlateBoundary,
   renderSatellite,
   updateSatelliteLive,
+  type PlateBoundaryInfo,
 } from './ui/details.ts';
 import {
   renderLegend,
@@ -31,6 +36,7 @@ import {
   renderSourcesSummary,
   setLegendVisible,
   toast,
+  type SearchItem,
 } from './ui/panels.ts';
 import { buildViewHash, parseViewState, type SharedSelection, type ViewState } from './ui/urlState.ts';
 
@@ -72,8 +78,17 @@ setTimeout(() => loader.classList.add('done'), 8000);
 const quakes = new EarthquakeLayer();
 const aircraft = new AircraftLayer();
 const satellites = new SatelliteLayer();
-const layers: Record<LayerId, Layer> = { earthquakes: quakes, aircraft, satellites };
+const plates = new PlateLayer();
+const layers: Record<LayerId, Layer> = { earthquakes: quakes, aircraft, satellites, plates };
 for (const l of Object.values(layers)) globe.world.add(l.group);
+
+/** Bildirim ve ipuçlarında kullanılan katman adları */
+const LAYER_NAMES: Record<LayerId, { noun: string; tag: string }> = {
+  earthquakes: { noun: 'Deprem', tag: 'DEPREM' },
+  aircraft: { noun: 'Uçak', tag: 'UÇAK' },
+  satellites: { noun: 'Uydu', tag: 'UYDU' },
+  plates: { noun: 'Plaka sınırı', tag: 'PLAKA' },
+};
 
 // ---------------------------------------------------------------- durum
 interface LayerState {
@@ -86,6 +101,7 @@ const state: Record<LayerId, LayerState> = {
   earthquakes: { meta: null, loading: true, error: null, receivedAt: null },
   aircraft: { meta: null, loading: true, error: null, receivedAt: null },
   satellites: { meta: null, loading: true, error: null, receivedAt: null },
+  plates: { meta: null, loading: true, error: null, receivedAt: null },
 };
 let aircraftObservedAt = Date.now();
 
@@ -121,13 +137,15 @@ function failed(id: LayerId, err: Error) {
   state[id].loading = false;
   state[id].error = err.message;
   updateLayerStatus();
-  toast($('toasts'), `${{ earthquakes: 'Deprem', aircraft: 'Uçak', satellites: 'Uydu' }[id]} verisi alınamadı: ${err.message}`);
+  toast($('toasts'), `${LAYER_NAMES[id].noun} verisi alınamadı: ${err.message}`);
 }
 
 function received(id: LayerId, meta: SourceMetaDto) {
   Object.assign(state[id], { meta, loading: false, error: null, receivedAt: Date.now() });
   updateLayerStatus();
   if (selection?.kind === 'layer' && selection.layer === id) refreshSelection();
+  // plaka detayındaki "yakın depremler" sayısı deprem verisine bağlı
+  if (id === 'earthquakes' && selection?.kind === 'layer' && selection.layer === 'plates') refreshSelection();
   resolvePendingShared(id);
 }
 
@@ -140,6 +158,7 @@ function resolvePendingShared(id: LayerId) {
       earthquakes: 'deprem seçili zaman aralığında',
       aircraft: 'uçak şu an yayında (inmiş olabilir)',
       satellites: 'uydu bu grupta',
+      plates: 'plaka sınırı',
     }[id];
     toast($('toasts'), `Paylaşılan ${what} bulunamadı.`, 'info');
     return;
@@ -235,6 +254,34 @@ aircraftPoller.start();
 satellitePoller.start();
 statusPoller.start();
 
+// Tektonik plakalar: değişmeyen veri, sitenin kendi dosyasından bir kez yüklenir
+let platesMeta: SourceMetaDto | null = null;
+async function loadPlates() {
+  const url = `${import.meta.env.BASE_URL}data/plates.json`;
+  try {
+    const res = await fetch(url);
+    if (!res.ok) throw new Error(`HTTP ${res.status}`);
+    const data = (await res.json()) as PlateData;
+    plates.setData(data);
+    platesMeta = {
+      id: 'plates',
+      name: 'Tektonik plaka sınırları — Bird (2003) PB2002 modeli',
+      url: 'https://github.com/fraxen/tectonicplates',
+      status: 'ok',
+      fetchedAt: Date.now(),
+      lastAttemptAt: Date.now(),
+      nextRefreshAt: null,
+      count: data.lines.length,
+      error: null,
+      ttlSeconds: 0,
+    };
+    received('plates', platesMeta);
+  } catch (err) {
+    failed('plates', err as Error);
+  }
+}
+void loadPlates();
+
 // ---------------------------------------------------------------- katman kontrolleri
 function updateLayerStatus() {
   for (const id of Object.keys(layers) as LayerId[]) {
@@ -256,6 +303,7 @@ function updateLayerStatus() {
       text = `${cls === 'ok' ? 'Güncel' : 'Bayat'} · veri ${fetched}`;
       if (id === 'aircraft') text += ` · ölçüm ${relativeTime(aircraftObservedAt)}`;
       if (id === 'satellites' && satellites.visibleCount === 0 && satellites.data.length > 0) text = 'Yörüngeler hesaplanıyor…';
+      if (id === 'plates') text = 'PB2002 modeli (Bird, 2003) · sabit veri';
     }
     el.className = `layer-status ${cls}`;
     el.textContent = text;
@@ -287,6 +335,7 @@ quakeMin.addEventListener('input', () => {
   $('quake-min-out').textContent = `M${Number(quakeMin.value).toFixed(1)}`;
   quakes.setFilter({ minMagnitude: Number(quakeMin.value) });
   updateLayerStatus();
+  if (selection?.kind === 'layer' && selection.layer === 'plates') refreshSelection();
 });
 if (initialView.minMagnitude) {
   quakeMin.value = String(initialView.minMagnitude);
@@ -350,8 +399,9 @@ $('sources-toggle').addEventListener('click', () => {
   renderSourcesView();
 });
 function renderSourcesView() {
-  renderSourcesSummary($('sources-summary'), lastSources);
-  if (!sourcesBody.hidden) renderSources(sourcesBody, lastSources, openskyAuth);
+  const all = platesMeta ? [...lastSources, platesMeta] : lastSources;
+  renderSourcesSummary($('sources-summary'), all);
+  if (!sourcesBody.hidden) renderSources(sourcesBody, all, openskyAuth);
 }
 
 // ---------------------------------------------------------------- seçim (picking)
@@ -375,10 +425,11 @@ function pickAt(clientX: number, clientY: number): Hit | null {
   const h2 = rect.height / 2;
   const camPos = cam.position;
   let best: Hit | null = null;
-  // uydular ve uçaklar küçük; depremlere göre hafif öncelik ver
-  const bias: Record<LayerId, number> = { satellites: 0, aircraft: 0, earthquakes: 3 };
+  // uydular ve uçaklar küçük; depremlere göre hafif öncelik ver.
+  // Plaka çizgileri en altta: yalnızca üstünde başka nesne yoksa seçilir.
+  const bias: Record<LayerId, number> = { satellites: 0, aircraft: 0, earthquakes: 3, plates: 6 };
 
-  for (const id of ['satellites', 'aircraft', 'earthquakes'] as LayerId[]) {
+  for (const id of ['satellites', 'aircraft', 'earthquakes', 'plates'] as LayerId[]) {
     layers[id].forEachPickable((index, p) => {
       const cw = vp[3] * p.x + vp[7] * p.y + vp[11] * p.z + vp[15];
       if (cw <= 0) return;
@@ -419,8 +470,7 @@ container.addEventListener('pointermove', (e) => {
     const hit = pickAt(ev.clientX, ev.clientY);
     container.classList.toggle('hovering', Boolean(hit));
     if (hit) {
-      const kind = { earthquakes: 'DEPREM', aircraft: 'UÇAK', satellites: 'UYDU' }[hit.layer];
-      tooltip.innerHTML = `<b>${kind}</b>`;
+      tooltip.innerHTML = `<b>${LAYER_NAMES[hit.layer].tag}</b>`;
       tooltip.append(layers[hit.layer].label(hit.index));
       tooltip.style.left = `${ev.clientX}px`;
       tooltip.style.top = `${ev.clientY}px`;
@@ -498,11 +548,31 @@ function refreshSelection() {
   else if (id === 'aircraft') {
     const a = aircraft.item(idx)!;
     detailsContent.innerHTML = renderAircraft(a, aircraft.estimate(a, Date.now()), aircraftObservedAt);
+  } else if (id === 'plates') {
+    detailsContent.innerHTML = renderPlateBoundary(plateInfo(idx));
   } else {
     detailsContent.innerHTML = renderSatellite(satellites.item(idx)!, satellites.satrec(idx));
     renderPassSection();
   }
   details.hidden = false;
+}
+
+/** Plaka sınırı + seçili zaman aralığında bu sınıra 100 km içindeki depremler */
+function plateInfo(idx: number): PlateBoundaryInfo {
+  const line = plates.plateData!.lines[idx];
+  const parts = plates.partsOf(idx);
+  const near = quakes.data.filter((q) => distanceToBoundaryKm(q.lat, q.lon, parts) <= 100);
+  const strongest = near.reduce<(typeof near)[number] | null>((a, b) => (!a || b.magnitude > a.magnitude ? b : a), null);
+  return {
+    title: plates.title(idx),
+    subduction: line.sub === 1,
+    source: line.src,
+    lengthKm: boundaryLengthKm(line.c),
+    nearbyQuakes: near.length,
+    strongest: strongest ? { magnitude: strongest.magnitude, place: strongest.place } : null,
+    feedLabel: QUAKE_FEEDS[quakeFeedSel.value as keyof typeof QUAKE_FEEDS],
+    minMagnitude: Number(quakeMin.value),
+  };
 }
 
 $('details-close').addEventListener('click', clearSelection);
@@ -512,10 +582,11 @@ function flyToSelection(follow: boolean): boolean {
   const idx = layers[selection.layer].indexOfKey(selection.key);
   if (idx < 0 || !layers[selection.layer].positionOf(idx, tmp)) return false;
   const ll = vec3ToLatLon(tmp);
-  const dist = selection.layer === 'satellites' ? Math.max(ll.radius + 0.8, 1.6) : 1.45;
+  const dist =
+    selection.layer === 'satellites' ? Math.max(ll.radius + 0.8, 1.6) : selection.layer === 'plates' ? 1.9 : 1.45;
   globe.flyTo(ll.lat, ll.lon, dist);
   following = false;
-  if (follow && selection.layer !== 'earthquakes') {
+  if (follow && (selection.layer === 'aircraft' || selection.layer === 'satellites')) {
     const target = selection.key;
     setTimeout(() => {
       following = selection?.kind === 'layer' && selection.key === target;
@@ -638,7 +709,7 @@ $('details-share').addEventListener('click', () => void shareCurrentView());
 // ---------------------------------------------------------------- arama
 const searchInput = $<HTMLInputElement>('search-input');
 const searchResults = $('search-results');
-let results: GeocodeResult[] = [];
+let results: SearchItem[] = [];
 let activeResult = 0;
 let searchTimer: ReturnType<typeof setTimeout> | null = null;
 let searchAbort: AbortController | null = null;
@@ -648,6 +719,14 @@ function closeResults() {
   searchInput.setAttribute('aria-expanded', 'false');
 }
 
+function showResults(items: SearchItem[], placesPending: boolean) {
+  results = items;
+  activeResult = Math.min(activeResult, Math.max(0, items.length - 1));
+  renderSearchResults(searchResults, results, activeResult, placesPending);
+  searchResults.hidden = false;
+  searchInput.setAttribute('aria-expanded', 'true');
+}
+
 searchInput.addEventListener('input', () => {
   const q = searchInput.value.trim();
   if (searchTimer) clearTimeout(searchTimer);
@@ -655,21 +734,52 @@ searchInput.addEventListener('input', () => {
     closeResults();
     return;
   }
+  // uçak ve uydu eşleşmeleri eldeki veriden anında; yerler ağdan biraz sonra gelir
+  activeResult = 0;
+  showResults(objectMatches(q), true);
   searchTimer = setTimeout(async () => {
     searchAbort?.abort();
     searchAbort = new AbortController();
     try {
       const r = await api.geocode(q, searchAbort.signal);
-      results = r.data;
-      activeResult = 0;
-      renderSearchResults(searchResults, results, activeResult);
-      searchResults.hidden = false;
-      searchInput.setAttribute('aria-expanded', 'true');
+      // veri bu arada gelmiş olabilir: nesne eşleşmelerini yeniden hesapla
+      showResults([...objectMatches(q), ...r.data.map((place) => ({ kind: 'place' as const, place }))], false);
     } catch (err) {
-      if ((err as Error).name !== 'AbortError') toast($('toasts'), `Arama başarısız: ${(err as Error).message}`);
+      if ((err as Error).name === 'AbortError') return;
+      showResults(objectMatches(q), false);
+      toast($('toasts'), `Yer araması başarısız: ${(err as Error).message}`);
     }
   }, 250);
 });
+
+function objectMatches(q: string): SearchItem[] {
+  return [...matchAircraft(aircraft.data, q), ...matchSatellites(satellites.data, q)].map((m) => ({ kind: 'object', ...m }));
+}
+
+function chooseResult(item: SearchItem | undefined) {
+  if (!item) return;
+  if (item.kind === 'place') {
+    choosePlace(item.place);
+    return;
+  }
+  closeResults();
+  searchInput.value = item.title;
+  searchInput.blur();
+  const idx = layers[item.layer].indexOfKey(item.key);
+  if (idx < 0) {
+    toast($('toasts'), `${item.title} artık listede yok.`, 'info');
+    return;
+  }
+  // katman kapalıysa aç: seçilen nesne görünmeli
+  const toggle = $<HTMLInputElement>(`toggle-${item.layer}`);
+  if (!toggle.checked) {
+    toggle.checked = true;
+    toggle.dispatchEvent(new Event('change'));
+  }
+  selectLayerItem(item.layer, idx);
+  // konum bir sonraki karede hesaplanır; hazır olunca kamera oraya gider
+  pendingFly = true;
+}
 
 searchInput.addEventListener('keydown', (e) => {
   if (e.key === 'Escape') {
@@ -684,7 +794,7 @@ searchInput.addEventListener('keydown', (e) => {
     renderSearchResults(searchResults, results, activeResult);
   } else if (e.key === 'Enter') {
     e.preventDefault();
-    choosePlace(results[activeResult]);
+    chooseResult(results[activeResult]);
   }
 });
 
@@ -692,7 +802,7 @@ searchResults.addEventListener('pointerdown', (e) => {
   const li = (e.target as HTMLElement).closest<HTMLElement>('li[data-index]');
   if (!li) return;
   e.preventDefault();
-  choosePlace(results[Number(li.dataset.index)]);
+  chooseResult(results[Number(li.dataset.index)]);
 });
 searchInput.addEventListener('blur', () => setTimeout(closeResults, 150));
 searchInput.addEventListener('focus', () => {

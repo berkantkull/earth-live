@@ -31,6 +31,12 @@ export const ORBIT_COLORS = {
   HEO: '#ff7ab6',
 } as const;
 
+export const PLATE_COLORS = {
+  boundary: '#f4c95d',
+  subduction: '#ff7a59',
+  selected: '#ffffff',
+} as const;
+
 export function stopColor(stops: Stop[], value: number): string {
   let color = stops[0].color;
   for (const s of stops) if (value >= s.at) color = s.color;

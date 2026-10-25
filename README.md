@@ -4,10 +4,13 @@ Gerçek Dünya gözlem verilerini fotogerçekçi bir 3B gezegen üzerinde göste
 
 **Canlı:** https://berkantkull.github.io/earth-live/
 
+[![EARTH LIVE — uydularla çevrili 3B Dünya](public/og-image.jpg)](https://berkantkull.github.io/earth-live/)
+
 - **Depremler** — USGS Earthquake Hazards Program GeoJSON akışları (son 1 saat → son 30 gün). Renk derinliği, boyut büyüklüğü gösterir; son 3 saatteki olaylar nabız halkasıyla işaretlenir. Detayda PAGER/tsunami bilgisi ve açığa çıkan enerji yer alır.
 - **Uçaklar** — OpenSky Network ADS-B durum vektörleri (~12 bin uçak). Konumlar, ölçüm anından itibaren hız ve rota ile ileri tahmin edilir (dead reckoning); veri yenilemeleri arasında uçaklar akıcı hareket eder.
 - **Uydular** — CelesTrak GP/TLE verisi; yörüngeler tarayıcıda, ayrı bir Web Worker içinde SGP4 ile hesaplanır. Seçilen uydu için bir periyotluk yörünge izi, canlı irtifa/hız/alt-uydu noktası ve yörünge elemanları gösterilir. CelesTrak bir grubu veremezse "tüm aktif uydular" için SatNOGS DB yedek kaynak olarak kullanılır.
-- **Şehir arama** — Open-Meteo Geocoding (GeoNames); kamera konuma uçar, yerel saat ve güneş yüksekliği gösterilir.
+- **Tektonik plakalar** — Bird (2003) PB2002 modelindeki 241 plaka sınırı; dalma-batma zonları ayrı renkte. Bir sınır seçilince uzunluğu ve seçili zaman aralığında sınıra 100 km içindeki depremler gösterilir.
+- **Arama** — Şehir/yer (Open-Meteo Geocoding, GeoNames), uçuş (çağrı işareti, ör. `THY`) veya uydu (ad ya da NORAD numarası, ör. `ISS`, `25544`). Kamera seçilen yere ya da nesneye uçar.
 - **Uydu geçiş tahmini** — Seçilen uydunun aranan şehir ya da cihaz konumu üzerinden önümüzdeki geçişleri: saat, en yüksek açı, doğuş/batış yönü ve çıplak gözle görünürlük (gökyüzü karanlık ve uydu Güneş ışığı alıyorsa).
 - **Paylaşılabilir bağlantılar** — Kamera, seçili nesne ve filtreler adres çubuğunda tutulur (`#c=…&s=…`); bağlantıyı açan kişi aynı görünümü görür. Bağlantı paylaşıldığında önizleme kartı çıkar.
 - **Gerçek aydınlatma** — Güneş-altı noktası astronomik formüllerle hesaplanır; gece/gündüz sınırı, şehir ışıkları, okyanus parlaması, bulut gölgeleri ve atmosfer gerçek zamana göre çizilir.
@@ -80,6 +83,7 @@ tests/             Vitest: geometri, güneş/yörünge, ayrıştırıcılar, ön
 - USGS deprem verisi — kamu malı (U.S. Government).
 - OpenSky Network — [kullanım koşulları](https://opensky-network.org/about/terms-of-use), ticari olmayan kullanım.
 - CelesTrak GP verisi — [celestrak.org](https://celestrak.org); SatNOGS DB — CC BY-SA 4.0.
+- Tektonik plaka sınırları — Bird, P. (2003), *An updated digital model of plate boundaries*, G³ 4(3), 1027; GeoJSON: [fraxen/tectonicplates](https://github.com/fraxen/tectonicplates) (ODC-By 1.0).
 - Open-Meteo Geocoding — CC BY 4.0, GeoNames verisi.
 - Dünya dokuları — [Solar System Scope](https://www.solarsystemscope.com/textures/) (CC BY 4.0, NASA Blue Marble/Black Marble türevleri); normal ve speküler haritalar three.js örnek dokularından.
 

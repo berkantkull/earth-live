@@ -126,6 +126,9 @@ button, input, select { font: inherit; color: inherit; }
 #search-results li .r-sub { color: var(--text-dim); font-size: 12px; }
 #search-results li .r-coord { font: 11px var(--mono); color: var(--muted); white-space: nowrap; }
 #search-results .r-empty { color: var(--text-dim); cursor: default; }
+#search-results .r-tag { font: 600 10px/1 var(--mono); letter-spacing: 0.1em; padding: 4px 6px; border-radius: 5px; border: 1px solid; }
+#search-results .r-tag.aircraft { color: var(--aircraft); border-color: rgba(255, 224, 102, 0.45); }
+#search-results .r-tag.satellites { color: var(--satellite); border-color: rgba(110, 231, 255, 0.45); }
 
 .topbar-right { display: flex; justify-content: flex-end; align-items: center; gap: 10px; }
 .clock { display: flex; align-items: center; gap: 12px; }
@@ -191,6 +194,12 @@ button, input, select { font: inherit; color: inherit; }
 .layer-icon.aircraft::after { content: ''; position: absolute; inset: 5px; background: var(--aircraft); clip-path: polygon(50% 0, 56% 31%, 100% 55%, 100% 64%, 56% 54%, 55% 82%, 70% 92%, 70% 100%, 50% 95%, 30% 100%, 30% 92%, 45% 82%, 44% 54%, 0 64%, 0 55%, 44% 31%); }
 .layer-icon.satellite { background: radial-gradient(circle, var(--satellite) 0 3px, transparent 4px), rgba(110, 231, 255, 0.1); }
 .layer-icon.satellite::after { content: ''; position: absolute; inset: 4px; border-radius: 50%; border: 1px dashed rgba(110, 231, 255, 0.6); transform: scaleY(0.45) rotate(-20deg); }
+
+.layer-icon.plates { background: rgba(244, 201, 93, 0.1); overflow: hidden; }
+.layer-icon.plates::before,
+.layer-icon.plates::after { content: ''; position: absolute; left: -4px; right: -4px; height: 2px; border-radius: 2px; }
+.layer-icon.plates::before { top: 9px; background: #f4c95d; transform: rotate(-18deg); }
+.layer-icon.plates::after { top: 16px; background: #ff7a59; transform: rotate(14deg); }
 
 .layer-body { padding: 0 12px 10px; display: grid; gap: 10px; }
 .layer-status {
