@@ -1,0 +1,49 @@
+name: Veri güncelleme
+
+# Uçak ve uydu anlık görüntülerini "data" dalına yazar.
+# Pages sürümü bu dosyaları raw.githubusercontent.com üzerinden okur.
+on:
+  schedule:
+    - cron: '*/10 * * * *'
+  workflow_dispatch:
+
+permissions:
+  contents: write
+
+concurrency:
+  group: data
+  cancel-in-progress: false
+
+jobs:
+  update:
+    runs-on: ubuntu-latest
+    timeout-minutes: 8
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 24
+
+      - name: Önceki veriyi al
+        run: |
+          mkdir -p data-out
+          if git fetch --depth=1 origin data 2>/dev/null; then
+            git --work-tree=data-out checkout FETCH_HEAD -- .
+          fi
+
+      - name: Kaynaklardan veri çek
+        run: node scripts/fetch-data.ts data-out
+        env:
+          OPENSKY_CLIENT_ID: ${{ secrets.OPENSKY_CLIENT_ID }}
+          OPENSKY_CLIENT_SECRET: ${{ secrets.OPENSKY_CLIENT_SECRET }}
+
+      - name: data dalına yayınla (tek commit, geçmiş birikmez)
+        working-directory: data-out
+        env:
+          TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        run: |
+          git init -q -b data
+          git add -A
+          git -c user.name="Berkant Kul" -c user.email="98064889+berkantkull@users.noreply.github.com" \
+            commit -q -m "Veri güncellemesi $(date -u +%Y-%m-%dT%H:%MZ)"
+          git push -q -f "https://x-access-token:${TOKEN}@github.com/${GITHUB_REPOSITORY}.git" data

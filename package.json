@@ -1,0 +1,37 @@
+{
+  "name": "earth-live",
+  "version": "1.0.0",
+  "private": true,
+  "description": "EARTH LIVE — Global Observation & Monitoring System",
+  "author": "Berkant Kul",
+  "license": "SEE LICENSE IN LICENSE",
+  "homepage": "https://berkantkull.github.io/earth-live/",
+  "repository": {
+    "type": "git",
+    "url": "https://github.com/berkantkull/earth-live.git"
+  },
+  "type": "module",
+  "engines": {
+    "node": ">=22.18"
+  },
+  "scripts": {
+    "dev": "vite",
+    "build": "tsc --noEmit && vite build",
+    "start": "node server/index.ts",
+    "preview": "npm run build && npm start",
+    "test": "vitest run",
+    "test:watch": "vitest",
+    "typecheck": "tsc --noEmit"
+  },
+  "dependencies": {
+    "satellite.js": "^7.1.0",
+    "three": "^0.186.1"
+  },
+  "devDependencies": {
+    "@types/node": "^26.6.5",
+    "@types/three": "^0.186.0",
+    "typescript": "^5.9.3",
+    "vite": "^8.3.5",
+    "vitest": "^5.0.5"
+  }
+}

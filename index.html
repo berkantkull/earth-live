@@ -1,0 +1,184 @@
+<!doctype html>
+<html lang="tr">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover" />
+    <meta name="description" content="EARTH LIVE — depremleri, uçakları ve uyduları gerçek zamanlı olarak 3B Dünya üzerinde izleyin." />
+    <meta name="theme-color" content="#04070d" />
+    <meta name="author" content="Berkant Kul" />
+    <title>EARTH LIVE — Global Observation & Monitoring System</title>
+    <link rel="icon" type="image/svg+xml" href="/favicon.svg" />
+    <link rel="preconnect" href="https://fonts.googleapis.com" />
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+    <link
+      href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&family=JetBrains+Mono:wght@400;500;600&display=swap"
+      rel="stylesheet"
+    />
+  </head>
+  <body>
+    <div id="app">
+      <div id="globe" aria-label="3B Dünya görünümü"></div>
+      <div class="vignette" aria-hidden="true"></div>
+
+      <header class="topbar">
+        <div class="brand">
+          <svg class="brand-mark" viewBox="0 0 32 32" aria-hidden="true">
+            <circle cx="16" cy="16" r="10" fill="none" stroke="currentColor" stroke-width="1.6" />
+            <ellipse cx="16" cy="16" rx="15" ry="5.5" fill="none" stroke="currentColor" stroke-width="1" opacity=".55" transform="rotate(-24 16 16)" />
+            <circle cx="28.6" cy="10.2" r="1.8" fill="currentColor" />
+            <path d="M8 13.5c3 .8 4.6-.6 6.6.4 1.8.9 1.2 3.4 3.6 3.9 2.1.4 3.5-1.1 5.6-.7" fill="none" stroke="currentColor" stroke-width="1.2" opacity=".8" />
+          </svg>
+          <div>
+            <h1>EARTH LIVE</h1>
+            <p>Global Observation &amp; Monitoring System</p>
+          </div>
+        </div>
+
+        <div class="search" role="search">
+          <svg viewBox="0 0 24 24" aria-hidden="true"><circle cx="11" cy="11" r="7" /><path d="m20 20-3.5-3.5" /></svg>
+          <input
+            id="search-input"
+            type="search"
+            placeholder="Şehir veya yer ara…"
+            autocomplete="off"
+            spellcheck="false"
+            aria-label="Şehir ara"
+            aria-controls="search-results"
+            aria-expanded="false"
+          />
+          <kbd>/</kbd>
+          <ul id="search-results" role="listbox" hidden></ul>
+        </div>
+
+        <div class="topbar-right">
+          <button class="icon-btn mobile-only" id="toggle-layers" aria-label="Katmanlar">
+            <svg viewBox="0 0 24 24"><path d="m12 3 9 5-9 5-9-5 9-5Z" /><path d="m3 13 9 5 9-5" /></svg>
+          </button>
+          <div class="clock">
+            <div class="live-badge"><span class="pulse-dot"></span>CANLI</div>
+            <div class="clock-times">
+              <span id="clock-utc">--:--:-- UTC</span>
+              <span id="clock-local" class="muted">--</span>
+            </div>
+          </div>
+        </div>
+      </header>
+
+      <aside class="panel layers-panel" id="layers-panel" aria-label="Gözlem katmanları">
+        <div class="panel-heading">Gözlem katmanları</div>
+
+        <section class="layer-card" data-layer="earthquakes">
+          <header>
+            <span class="layer-icon quake" aria-hidden="true"></span>
+            <div class="layer-name">
+              <strong>Depremler</strong>
+              <small>USGS · sismik ağ</small>
+            </div>
+            <span class="layer-count" id="count-earthquakes">—</span>
+            <label class="switch"><input type="checkbox" id="toggle-earthquakes" checked /><span></span><em class="sr">Depremler</em></label>
+          </header>
+          <div class="layer-body">
+            <label class="field">
+              <span>Zaman aralığı</span>
+              <select id="quake-feed"></select>
+            </label>
+            <label class="field">
+              <span>Min. büyüklük <output id="quake-min-out">M0.0</output></span>
+              <input type="range" id="quake-min" min="0" max="7" step="0.5" value="0" />
+            </label>
+          </div>
+          <footer class="layer-status" id="status-earthquakes">Bekleniyor…</footer>
+        </section>
+
+        <section class="layer-card" data-layer="aircraft">
+          <header>
+            <span class="layer-icon aircraft" aria-hidden="true"></span>
+            <div class="layer-name">
+              <strong>Uçaklar</strong>
+              <small>OpenSky · ADS-B</small>
+            </div>
+            <span class="layer-count" id="count-aircraft">—</span>
+            <label class="switch"><input type="checkbox" id="toggle-aircraft" checked /><span></span><em class="sr">Uçaklar</em></label>
+          </header>
+          <div class="layer-body">
+            <label class="check">
+              <input type="checkbox" id="aircraft-ground" />
+              <span>Yerdeki uçakları göster</span>
+            </label>
+          </div>
+          <footer class="layer-status" id="status-aircraft">Bekleniyor…</footer>
+        </section>
+
+        <section class="layer-card" data-layer="satellites">
+          <header>
+            <span class="layer-icon satellite" aria-hidden="true"></span>
+            <div class="layer-name">
+              <strong>Uydular</strong>
+              <small>CelesTrak · SGP4</small>
+            </div>
+            <span class="layer-count" id="count-satellites">—</span>
+            <label class="switch"><input type="checkbox" id="toggle-satellites" checked /><span></span><em class="sr">Uydular</em></label>
+          </header>
+          <div class="layer-body">
+            <label class="field">
+              <span>Uydu grubu</span>
+              <select id="sat-group"></select>
+            </label>
+          </div>
+          <footer class="layer-status" id="status-satellites">Bekleniyor…</footer>
+        </section>
+
+        <div class="panel-heading">Görünüm</div>
+        <div class="view-options">
+          <label class="check"><input type="checkbox" id="opt-rotate" checked /><span>Otomatik dönüş</span></label>
+          <label class="check"><input type="checkbox" id="opt-lighting" checked /><span>Gerçek gün/gece aydınlatması</span></label>
+          <label class="check"><input type="checkbox" id="opt-clouds" checked /><span>Bulut katmanı</span></label>
+          <label class="check"><input type="checkbox" id="opt-atmosphere" checked /><span>Atmosfer</span></label>
+        </div>
+      </aside>
+
+      <aside class="panel details-panel" id="details-panel" aria-live="polite" hidden>
+        <button class="close-btn" id="details-close" aria-label="Kapat">
+          <svg viewBox="0 0 24 24"><path d="M6 6l12 12M18 6 6 18" /></svg>
+        </button>
+        <div id="details-content"></div>
+      </aside>
+
+      <section class="panel sources-panel" id="sources-panel">
+        <button class="sources-toggle" id="sources-toggle" aria-expanded="false" aria-controls="sources-body">
+          <span class="panel-heading">Veri kaynakları</span>
+          <span class="sources-summary" id="sources-summary"></span>
+          <svg class="chev" viewBox="0 0 24 24"><path d="m6 15 6-6 6 6" /></svg>
+        </button>
+        <div class="sources-body" id="sources-body" hidden></div>
+      </section>
+
+      <div class="legend" id="legend" aria-label="Lejant"></div>
+
+      <div class="hud" aria-live="off">
+        <div><span class="muted">İMLEÇ</span> <span id="hud-cursor">—</span></div>
+        <div><span class="muted">KAMERA İRTİFASI</span> <span id="hud-alt">—</span></div>
+        <div><span class="muted">GÜNEŞ-ALTI</span> <span id="hud-sun">—</span></div>
+      </div>
+
+      <footer class="copyright">
+        © <span id="copyright-year">2026</span> Berkant Kul · EARTH LIVE · Tüm hakları saklıdır.
+      </footer>
+
+      <div id="tooltip" role="tooltip" hidden></div>
+      <div id="reticle" aria-hidden="true" hidden><span></span></div>
+      <div id="toasts" aria-live="assertive"></div>
+
+      <div id="loader">
+        <div class="loader-inner">
+          <div class="loader-orbit"><span></span></div>
+          <h2>EARTH LIVE</h2>
+          <p id="loader-text">Gezegen dokuları yükleniyor…</p>
+          <div class="loader-bar"><span id="loader-progress"></span></div>
+        </div>
+      </div>
+      <noscript>EARTH LIVE çalışmak için JavaScript ve WebGL gerektirir.</noscript>
+    </div>
+    <script type="module" src="/src/main.ts"></script>
+  </body>
+</html>
