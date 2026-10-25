@@ -57,14 +57,14 @@ const globe = new Globe(container, {
   onProgress: (loaded, total) => {
     $('loader-progress').style.width = `${(loaded / total) * 100}%`;
     if (loaded >= total) {
-      $('loader-text').textContent = 'Gözlem ağına bağlanılıyor…';
-      setTimeout(() => loader.classList.add('done'), 400);
-      setTimeout(() => loader.remove(), 1400);
+      // dokunun GPU'ya yüklendiği kare çizilsin, sonra perdeyi kaldır
+      requestAnimationFrame(() => loader.classList.add('done'));
+      setTimeout(() => loader.remove(), 800);
     }
   },
 });
 // dokular hiç yüklenemezse bile arayüzü aç
-setTimeout(() => loader.classList.add('done'), 15000);
+setTimeout(() => loader.classList.add('done'), 8000);
 
 const quakes = new EarthquakeLayer();
 const aircraft = new AircraftLayer();

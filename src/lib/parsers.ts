@@ -176,3 +176,58 @@ export function parseGeocode(json: { results?: OpenMeteoPlace[] }): GeocodeResul
     timezone: r.timezone ?? null,
   }));
 }
+
+// ---------------------------------------------------------------- sıkı uçak biçimi (statik mod veri dosyası)
+
+/**
+ * Pages sürümünün indirdiği aircraft.json için sıkı biçim: alan adları her kayıtta tekrar etmez,
+ * ülke adları sözlükten gelir, sayılar ölçüm hassasiyetine göre yuvarlanır (enlem/boylam ≈ 11 m).
+ */
+export interface PackedAircraft {
+  v: 2;
+  /** ölçüm zamanı, unix saniye; konum zamanları buna göre fark olarak tutulur */
+  t: number;
+  countries: string[];
+  /** [icao24, callsign, ülke#, lat, lon, alt, baroAlt, yerde(0/1), hız, rota, dikeyHız, squawk, Δkonum, Δtemas, kategori] */
+  rows: (string | number | null)[][];
+}
+
+const round = (n: number | null, digits: number) => (n === null ? null : Number(n.toFixed(digits)));
+
+export function packAircraft(list: Aircraft[], observedAtSec: number): PackedAircraft {
+  const countries: string[] = [];
+  const index = new Map<string, number>();
+  const rows = list.map((a) => {
+    let c = index.get(a.country);
+    if (c === undefined) {
+      c = countries.push(a.country) - 1;
+      index.set(a.country, c);
+    }
+    return [
+      a.icao24, a.callsign, c, round(a.lat, 4), round(a.lon, 4), round(a.altitudeM, 0), round(a.baroAltitudeM, 0),
+      a.onGround ? 1 : 0, round(a.velocity, 1), round(a.heading, 1), round(a.verticalRate, 1), a.squawk,
+      observedAtSec - a.positionTime, observedAtSec - a.lastContact, a.category,
+    ];
+  });
+  return { v: 2, t: observedAtSec, countries, rows };
+}
+
+export function unpackAircraft(p: PackedAircraft): Aircraft[] {
+  return p.rows.map((r) => ({
+    icao24: r[0] as string,
+    callsign: r[1] as string | null,
+    country: p.countries[r[2] as number] ?? '',
+    lat: r[3] as number,
+    lon: r[4] as number,
+    altitudeM: r[5] as number | null,
+    baroAltitudeM: r[6] as number | null,
+    onGround: r[7] === 1,
+    velocity: r[8] as number | null,
+    heading: r[9] as number | null,
+    verticalRate: r[10] as number | null,
+    squawk: r[11] as string | null,
+    positionTime: p.t - (r[12] as number),
+    lastContact: p.t - (r[13] as number),
+    category: r[14] as number | null,
+  }));
+}

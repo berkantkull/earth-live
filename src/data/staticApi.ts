@@ -12,7 +12,9 @@ import {
   parseGeocode,
   parseTle,
   parseUsgs,
+  unpackAircraft,
   usgsFeedUrl,
+  type PackedAircraft,
 } from '../lib/parsers.ts';
 import {
   QUAKE_FEEDS,
@@ -100,7 +102,10 @@ async function earthquakes(feed: string): Promise<ApiEnvelope<Earthquake[]>> {
 async function aircraft(): Promise<ApiEnvelope<Aircraft[]>> {
   if (!DATA_URL || DATA_URL === '/') throw new StaticApiError('Uçak veri adresi (VITE_DATA_URL) tanımlı değil', 0);
   const res = await request(`${DATA_URL}aircraft.json`);
-  return (await res.json()) as ApiEnvelope<Aircraft[]>;
+  const env = (await res.json()) as ApiEnvelope<Aircraft[] | PackedAircraft>;
+  // eski (nesne dizisi) ve yeni (sıkı) biçimin ikisini de kabul et
+  const data = Array.isArray(env.data) ? env.data : unpackAircraft(env.data);
+  return { ...env, data };
 }
 
 async function satellites(group: string): Promise<ApiEnvelope<SatelliteTle[]>> {

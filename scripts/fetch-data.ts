@@ -11,7 +11,7 @@
  */
 import { mkdir, readFile, stat, writeFile } from 'node:fs/promises';
 import { join } from 'node:path';
-import { celestrakUrl, OPENSKY_STATES_URL, SATNOGS_TLE_URL } from '../src/lib/parsers.ts';
+import { celestrakUrl, OPENSKY_STATES_URL, packAircraft, SATNOGS_TLE_URL } from '../src/lib/parsers.ts';
 import { SATELLITE_GROUPS, type ApiEnvelope, type SourceMetaDto } from '../src/lib/types.ts';
 import { fetchAircraft, hasOpenSkyCredentials } from '../server/sources/aircraft.ts';
 import { fetchCelestrak, fetchSatnogs, SATELLITE_TTL_SECONDS } from '../server/sources/satellites.ts';
@@ -60,7 +60,7 @@ const sources = new Map<string, SourceMetaDto>((prevStatus?.sources ?? []).map((
   try {
     const r = await fetchAircraft();
     const m = meta({ ...base, fetchedAt: Date.now(), count: r.aircraft.length, nextRefreshAt: Date.now() + AIRCRAFT_INTERVAL_S * 1000 });
-    await write('aircraft.json', { data: r.aircraft, meta: m, observedAt: r.time * 1000 } satisfies ApiEnvelope<unknown>);
+    await write('aircraft.json', { data: packAircraft(r.aircraft, r.time), meta: m, observedAt: r.time * 1000 } satisfies ApiEnvelope<unknown>);
     sources.set(id, m);
     console.log(`uçaklar: ${r.aircraft.length}`);
   } catch (err) {

@@ -51,7 +51,8 @@ export class SatelliteLayer implements Layer {
   readonly id = 'satellites' as const;
   readonly group = new THREE.Group();
   private tles: SatelliteTle[] = [];
-  private recs: (SatRec | null)[] = [];
+  /** SGP4 kayıtları yalnızca seçilen uydular için ana iş parçacığında, ihtiyaç anında oluşturulur */
+  private recs = new Map<number, SatRec | null>();
   private classes: Uint8Array = new Uint8Array(0);
   private worker: Worker;
   private points: THREE.Points | null = null;
@@ -103,7 +104,13 @@ export class SatelliteLayer implements Layer {
   }
 
   satrec(i: number) {
-    return this.recs[i] ?? null;
+    if (!this.tles[i]) return null;
+    let rec = this.recs.get(i);
+    if (rec === undefined) {
+      rec = makeSatrec(this.tles[i]);
+      this.recs.set(i, rec);
+    }
+    return rec;
   }
 
   orbitClassOf(i: number): keyof typeof ORBIT_COLORS {
@@ -117,7 +124,7 @@ export class SatelliteLayer implements Layer {
   setData(tles: SatelliteTle[]) {
     const selKey = this.selected !== null ? this.keyOf(this.selected) : null;
     this.tles = tles;
-    this.recs = tles.map(makeSatrec);
+    this.recs.clear();
     this.validCount = 0;
     this.pending = false;
     this.requestId++;
@@ -261,7 +268,7 @@ export class SatelliteLayer implements Layer {
   }
 
   private buildOrbit(index: number) {
-    const rec = this.recs[index];
+    const rec = this.satrec(index);
     if (!rec) return;
     const path = orbitPath(rec, new Date(), 360);
     const cls = this.orbitClassOf(index);

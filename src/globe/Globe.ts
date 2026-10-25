@@ -12,6 +12,7 @@ import {
   starFragment,
   starVertex,
 } from './shaders.ts';
+import { loadTexture, solidTexture, whenIdle } from './textures.ts';
 
 const TEX = `${import.meta.env.BASE_URL}textures/`;
 const ATMOSPHERE_RADIUS = 1.12;
@@ -51,6 +52,9 @@ export class Globe {
   private lastFrame = performance.now();
   private sunUpdatedAt = 0;
   private autoRotateResumeAt = 0;
+  private maxAniso = 1;
+  private hiResReady = false;
+  private ultraRequested = false;
   autoRotate = true;
 
   constructor(container: HTMLElement, opts: GlobeOptions = {}) {
@@ -83,23 +87,13 @@ export class Globe {
       this.pauseAutoRotate(12000);
     });
 
-    const manager = new THREE.LoadingManager();
-    manager.onProgress = (_url, loaded, total) => opts.onProgress?.(loaded, total);
-    const loader = new THREE.TextureLoader(manager);
-    const maxAniso = this.renderer.capabilities.getMaxAnisotropy();
-    const load = (name: string, srgb = true) => {
-      const t = loader.load(TEX + name);
-      t.colorSpace = srgb ? THREE.SRGBColorSpace : THREE.NoColorSpace;
-      t.anisotropy = Math.min(8, maxAniso);
-      return t;
-    };
-
-    const day = load('earth_day_2k.jpg');
-    const night = load('earth_night_8k.jpg');
-    const spec = load('earth_specular_2k.jpg', false);
-    const normal = load('earth_normal_2k.jpg', false);
-    const cloud = load('earth_clouds_2k.jpg', false);
-    cloud.wrapS = THREE.RepeatWrapping;
+    // Asıl dokular gelene kadar yer tutucular: sahne hemen çizilebilir
+    const day = solidTexture(18, 44, 82, true);
+    const night = solidTexture(0, 0, 0, true);
+    const spec = solidTexture(0, 0, 0);
+    const normal = solidTexture(128, 128, 255);
+    const cloud = solidTexture(0, 0, 0);
+    this.maxAniso = Math.min(8, this.renderer.capabilities.getMaxAnisotropy());
 
     this.earthMat = new THREE.ShaderMaterial({
       vertexShader: earthVertex,
@@ -119,16 +113,6 @@ export class Globe {
     const earth = new THREE.Mesh(new THREE.SphereGeometry(1, 192, 96), this.earthMat);
     earth.name = 'earth';
     this.scene.add(earth);
-
-    // 8K gündüz dokusu GPU destekliyorsa arkadan yüklenir
-    if (this.renderer.capabilities.maxTextureSize >= 8192) {
-      new THREE.TextureLoader().load(TEX + 'earth_day_8k.jpg', (hi) => {
-        hi.colorSpace = THREE.SRGBColorSpace;
-        hi.anisotropy = Math.min(8, maxAniso);
-        this.earthMat.uniforms.dayMap.value = hi;
-        day.dispose();
-      });
-    }
 
     this.cloudMat = new THREE.ShaderMaterial({
       vertexShader: cloudVertex,
@@ -167,6 +151,76 @@ export class Globe {
     this.updateSun(Date.now());
     window.addEventListener('resize', () => this.resize(container));
     this.renderer.setAnimationLoop(() => this.frame());
+    void this.loadTextures(opts);
+  }
+
+  /**
+   * Kademeli doku yükleme:
+   *  1) 2K gündüz + gece (~200 KB) → yükleme ekranı kapanır
+   *  2) bulut, normal, speküler, yıldızlar
+   *  3) tarayıcı boştayken 4K gündüz + gece
+   *  4) 8K gündüz yalnızca kullanıcı yakınlaşınca (bkz. frame)
+   */
+  private async loadTextures(opts: GlobeOptions) {
+    const u = this.earthMat.uniforms;
+    let done = 0;
+    const essential = (name: string, uniform: 'dayMap' | 'nightMap') =>
+      this.texture(name, true).then((t) => {
+        this.swap(u[uniform], t);
+        opts.onProgress?.(++done, 2);
+      });
+    try {
+      await Promise.all([essential('earth_day_2k.webp', 'dayMap'), essential('earth_night_2k.webp', 'nightMap')]);
+    } catch (err) {
+      console.error('Dünya dokuları yüklenemedi', err);
+      opts.onProgress?.(2, 2);
+    }
+
+    await Promise.allSettled([
+      this.texture('earth_clouds_2k.webp', false).then((t) => {
+        t.wrapS = THREE.RepeatWrapping;
+        this.swap(this.cloudMat.uniforms.cloudMap, t);
+        if (this.clouds.visible) u.cloudMap.value = t;
+      }),
+      this.texture('earth_normal_2k.webp', false).then((t) => this.swap(u.normalMap, t)),
+      this.texture('earth_specular_1k.webp', false).then((t) => this.swap(u.specMap, t)),
+      this.texture('stars_milky_way_2k.webp', true).then((t) => this.addSky(t)),
+    ]);
+
+    if (this.renderer.capabilities.maxTextureSize < 4096) return;
+    await whenIdle();
+    await Promise.allSettled([
+      this.texture('earth_day_4k.webp', true).then((t) => this.swap(u.dayMap, t)),
+      this.texture('earth_night_4k.webp', true).then((t) => this.swap(u.nightMap, t)),
+    ]);
+    this.hiResReady = true;
+  }
+
+  private async texture(name: string, srgb: boolean): Promise<THREE.Texture> {
+    const t = await loadTexture(TEX + name, srgb);
+    t.anisotropy = this.maxAniso;
+    // GPU'ya yüklemeyi şimdi yap: ilk kullanıldığı karede takılma olmasın
+    this.renderer.initTexture(t);
+    return t;
+  }
+
+  /** Uniform'daki dokuyu değiştirir, eskisini serbest bırakır */
+  private swap(uniform: THREE.IUniform, next: THREE.Texture) {
+    const prev = uniform.value as THREE.Texture | null;
+    uniform.value = next;
+    if (prev && prev !== next && prev !== this.cloudMat.uniforms.cloudMap.value) prev.dispose();
+  }
+
+  private maybeLoadUltraRes() {
+    if (this.ultraRequested || !this.hiResReady) return;
+    if (this.camera.position.length() > 1.75) return;
+    if (this.renderer.capabilities.maxTextureSize < 8192) return;
+    // dokunmatik/küçük cihazlarda 8K bellek ve bant genişliği israfı
+    if (window.matchMedia('(pointer: coarse)').matches) return;
+    this.ultraRequested = true;
+    this.texture('earth_day_8k.webp', true)
+      .then((t) => this.swap(this.earthMat.uniforms.dayMap, t))
+      .catch(() => {});
   }
 
   private createStars(): THREE.ShaderMaterial {
@@ -202,17 +256,17 @@ export class Globe {
     stars.renderOrder = -1;
     this.scene.add(stars);
 
-    // Samanyolu arka planı
-    new THREE.TextureLoader().load(TEX + 'stars_milky_way_2k.jpg', (t) => {
-      t.colorSpace = THREE.SRGBColorSpace;
-      const sky = new THREE.Mesh(
-        new THREE.SphereGeometry(90, 64, 32),
-        new THREE.MeshBasicMaterial({ map: t, side: THREE.BackSide, color: 0x3a4250, depthWrite: false }),
-      );
-      sky.renderOrder = -2;
-      this.scene.add(sky);
-    });
     return mat;
+  }
+
+  /** Samanyolu arka planı */
+  private addSky(t: THREE.Texture) {
+    const sky = new THREE.Mesh(
+      new THREE.SphereGeometry(90, 64, 32),
+      new THREE.MeshBasicMaterial({ map: t, side: THREE.BackSide, color: 0x3a4250, depthWrite: false }),
+    );
+    sky.renderOrder = -2;
+    this.scene.add(sky);
   }
 
   onFrame(cb: (dt: number, now: number) => void) {
@@ -307,6 +361,7 @@ export class Globe {
     const d = this.camera.position.length();
     this.controls.rotateSpeed = Math.min(0.6, 0.12 + (d - 1) * 0.22);
     this.controls.update(dt);
+    this.maybeLoadUltraRes();
 
     const cloudShift = (wall / 1000 / 86400) * 0.6; // bulutlar çok yavaş kayar
     this.cloudMat.uniforms.cloudOffset.value = cloudShift % 1;

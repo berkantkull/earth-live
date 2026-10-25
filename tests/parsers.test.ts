@@ -1,5 +1,14 @@
 import { describe, expect, it } from 'vitest';
-import { parseGeocode, parseOpenSky, parseSatnogs, parseTle, parseUsgs, type StateVector } from '../src/lib/parsers.ts';
+import {
+  packAircraft,
+  parseGeocode,
+  parseOpenSky,
+  parseSatnogs,
+  parseTle,
+  parseUsgs,
+  unpackAircraft,
+  type StateVector,
+} from '../src/lib/parsers.ts';
 import { ISS, OPENSKY_SAMPLE, TLE_TEXT, USGS_SAMPLE } from './fixtures.ts';
 
 describe('parseUsgs', () => {
@@ -92,5 +101,28 @@ describe('parseSatnogs', () => {
       { tle0: 'BAD', tle1: 'x', tle2: 'y', norad_cat_id: 1 },
     ]);
     expect(r).toEqual([{ ...ISS, name: 'ISS' }]);
+  });
+});
+
+describe('packAircraft / unpackAircraft', () => {
+  const { time, aircraft } = parseOpenSky(OPENSKY_SAMPLE as { time: number; states: StateVector[] });
+
+  it('gidiş-dönüşte veriyi (yuvarlama hassasiyetinde) korur', () => {
+    const back = unpackAircraft(JSON.parse(JSON.stringify(packAircraft(aircraft, time))));
+    expect(back).toHaveLength(aircraft.length);
+    back.forEach((b, i) => {
+      const a = aircraft[i];
+      expect(b).toMatchObject({ icao24: a.icao24, callsign: a.callsign, country: a.country, onGround: a.onGround, squawk: a.squawk });
+      expect(b.lat).toBeCloseTo(a.lat, 4);
+      expect(b.lon).toBeCloseTo(a.lon, 4);
+      expect(b.positionTime).toBe(a.positionTime);
+      expect(b.lastContact).toBe(a.lastContact);
+      expect(b.altitudeM === null ? null : Math.round(b.altitudeM)).toBe(a.altitudeM === null ? null : Math.round(a.altitudeM));
+    });
+  });
+
+  it('ülke adlarını sözlükte bir kez tutar', () => {
+    const twice = [...aircraft, { ...aircraft[0], icao24: 'zzz999' }];
+    expect(packAircraft(twice, time).countries).toEqual(['Switzerland', 'United States']);
   });
 });
