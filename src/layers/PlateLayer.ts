@@ -1,4 +1,5 @@
 import * as THREE from 'three';
+import { lang, t } from '../i18n.ts';
 import { latLonToVec3 } from '../lib/geo.ts';
 import { densify, type PlateData } from '../lib/plates.ts';
 import { PLATE_COLORS } from '../lib/scales.ts';
@@ -127,12 +128,13 @@ export class PlateLayer implements Layer {
   title(i: number) {
     const l = this.data?.lines[i];
     if (!l || !this.data) return '';
-    return `${this.data.names[l.a] ?? l.a} – ${this.data.names[l.b] ?? l.b}`;
+    const names = (lang === 'en' ? this.data.namesEn : undefined) ?? this.data.names;
+    return `${names[l.a] ?? l.a} – ${names[l.b] ?? l.b}`;
   }
 
   label(i: number) {
     const l = this.data?.lines[i];
-    return l ? `${this.title(i)} plaka sınırı${l.sub ? ' · dalma-batma' : ''}` : '';
+    return l ? t('plate.label', { title: this.title(i) }) + (l.sub ? t('plate.labelSub') : '') : '';
   }
 
   keyOf(i: number) {

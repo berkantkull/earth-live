@@ -1,6 +1,7 @@
 import * as THREE from 'three';
 import './styles.css';
 import { api, Poller } from './data/api.ts';
+import { applyStaticTranslations, lang, locale, setLang, t, type Key } from './i18n.ts';
 import { Globe } from './globe/Globe.ts';
 import { AircraftLayer } from './layers/AircraftLayer.ts';
 import { EarthquakeLayer } from './layers/EarthquakeLayer.ts';
@@ -59,8 +60,13 @@ function hasWebGL(): boolean {
   }
 }
 
+applyStaticTranslations();
+// düğme, geçilecek dili gösterir
+$('lang-toggle').textContent = lang === 'tr' ? 'EN' : 'TR';
+$('lang-toggle').addEventListener('click', () => setLang(lang === 'tr' ? 'en' : 'tr'));
+
 if (!hasWebGL()) {
-  $('loader-text').textContent = 'Bu tarayıcı WebGL 2 desteklemiyor — EARTH LIVE görüntülenemiyor.';
+  $('loader-text').textContent = t('app.webgl');
   throw new Error('WebGL2 desteklenmiyor');
 }
 
@@ -90,14 +96,8 @@ const layers: Record<LayerId, Layer> = { earthquakes: quakes, aircraft, satellit
 for (const l of Object.values(layers)) globe.world.add(l.group);
 
 /** Bildirim ve ipuçlarında kullanılan katman adları */
-const LAYER_NAMES: Record<LayerId, { noun: string; tag: string }> = {
-  earthquakes: { noun: 'Deprem', tag: 'DEPREM' },
-  aircraft: { noun: 'Uçak', tag: 'UÇAK' },
-  satellites: { noun: 'Uydu', tag: 'UYDU' },
-  plates: { noun: 'Plaka sınırı', tag: 'PLAKA' },
-  fires: { noun: 'Yangın', tag: 'YANGIN' },
-  events: { noun: 'Doğal olay', tag: 'OLAY' },
-};
+const layerNoun = (id: LayerId) => t(`layer.noun.${id}`);
+const layerTag = (id: LayerId) => t(`layer.tag.${id}`);
 
 // ---------------------------------------------------------------- durum
 interface LayerState {
@@ -125,9 +125,9 @@ let following = false;
 
 // ---------------------------------------------------------------- veri akışları
 const quakeFeedSel = $<HTMLSelectElement>('quake-feed');
-for (const [k, v] of Object.entries(QUAKE_FEEDS)) quakeFeedSel.add(new Option(v, k, k === 'all_day', k === 'all_day'));
+for (const k of Object.keys(QUAKE_FEEDS)) quakeFeedSel.add(new Option(t(`feed.${k}` as Key), k, k === 'all_day', k === 'all_day'));
 const satGroupSel = $<HTMLSelectElement>('sat-group');
-for (const [k, v] of Object.entries(SATELLITE_GROUPS)) satGroupSel.add(new Option(v, k, k === 'active', k === 'active'));
+for (const k of Object.keys(SATELLITE_GROUPS)) satGroupSel.add(new Option(t(`group.${k}` as Key), k, k === 'active', k === 'active'));
 
 // ---------------------------------------------------------------- paylaşılan bağlantı (#...)
 const initialView = parseViewState(location.hash);
@@ -151,7 +151,7 @@ function failed(id: LayerId, err: Error) {
   state[id].loading = false;
   state[id].error = err.message;
   updateLayerStatus();
-  toast($('toasts'), `${LAYER_NAMES[id].noun} verisi alınamadı: ${err.message}`);
+  toast($('toasts'), t('status.failed', { layer: layerNoun(id), msg: err.message }));
 }
 
 function received(id: LayerId, meta: SourceMetaDto) {
@@ -168,15 +168,7 @@ function resolvePendingShared(id: LayerId) {
   const idx = layers[id].indexOfKey(pendingShared.key);
   pendingShared = null;
   if (idx < 0) {
-    const what = {
-      earthquakes: 'deprem seçili zaman aralığında',
-      aircraft: 'uçak şu an yayında (inmiş olabilir)',
-      satellites: 'uydu bu grupta',
-      plates: 'plaka sınırı',
-      fires: 'yangın tespiti son 24 saatte',
-      events: 'doğal olay artık açık değil (sona ermiş olabilir)',
-    }[id];
-    toast($('toasts'), `Paylaşılan ${what} bulunamadı.`, 'info');
+    toast($('toasts'), t('shared.notFound', { what: t(`shared.${id}`) }), 'info');
     return;
   }
   selectLayerItem(id, idx);
@@ -218,12 +210,7 @@ const satellitePoller = new Poller(
     if (r.meta.fetchedAt !== state.satellites.meta?.fetchedAt || satellites.data.length === 0) satellites.setData(r.data);
     received('satellites', r.meta);
     if (r.provider === 'satnogs') {
-      toast(
-        $('toasts'),
-        `CelesTrak şu an bu grubu vermiyor; yedek kaynak SatNOGS DB'den ${num(r.data.length)} uydu gösteriliyor. CelesTrak birazdan tekrar denenecek.`,
-        'info',
-        9000,
-      );
+      toast($('toasts'), t('sat.satnogs', { count: num(r.data.length) }), 'info', 9000);
       // yedek veriyle 2 saat beklemek yerine CelesTrak'ı 20 dk sonra tekrar dene
       setTimeout(() => satellitePoller.refresh(), 20 * 60_000);
     }
@@ -235,7 +222,7 @@ const satellitePoller = new Poller(
     if (satellites.data.length === 0 && fallback) {
       toast(
         $('toasts'),
-        `"${SATELLITE_GROUPS[satGroupSel.value as SatelliteGroup]}" grubu şu an alınamadı (${e.message}). "${SATELLITE_GROUPS[fallback]}" grubu gösteriliyor.`,
+        t('sat.fallback', { group: t(`group.${satGroupSel.value}` as Key), msg: e.message, fallback: t(`group.${fallback}`) }),
         'info',
         9000,
       );
@@ -285,7 +272,7 @@ async function loadPlates() {
     plates.setData(data);
     platesMeta = {
       id: 'plates',
-      name: 'Tektonik plaka sınırları — Bird (2003) PB2002 modeli',
+      name: t('src.plates'),
       url: 'https://github.com/fraxen/tectonicplates',
       status: 'ok',
       fetchedAt: Date.now(),
@@ -332,20 +319,20 @@ function updateLayerStatus() {
     const layer = layers[id];
     $(`count-${id}`).textContent = s.meta || layer.visibleCount ? num(layer.visibleCount) : '—';
     let cls = 'idle';
-    let text = 'Bekleniyor…';
+    let text = t('status.waiting');
     if (s.loading && !s.meta) {
       cls = 'loading';
-      text = 'Yükleniyor…';
+      text = t('status.loading');
     } else if (s.error && !s.meta) {
       cls = 'error';
-      text = `Hata: ${s.error}`;
+      text = t('status.error', { msg: s.error });
     } else if (s.meta) {
       cls = s.error ? 'stale' : s.meta.status === 'stale' ? 'stale' : 'ok';
-      const fetched = s.meta.fetchedAt ? relativeTime(s.meta.fetchedAt) : '—';
-      text = `${cls === 'ok' ? 'Güncel' : 'Bayat'} · veri ${fetched}`;
-      if (id === 'aircraft') text += ` · ölçüm ${relativeTime(aircraftObservedAt)}`;
-      if (id === 'satellites' && satellites.visibleCount === 0 && satellites.data.length > 0) text = 'Yörüngeler hesaplanıyor…';
-      if (id === 'plates') text = 'PB2002 modeli (Bird, 2003) · sabit veri';
+      const ago = s.meta.fetchedAt ? relativeTime(s.meta.fetchedAt) : '—';
+      text = t('status.line', { state: cls === 'ok' ? t('status.fresh') : t('status.stale'), ago });
+      if (id === 'aircraft') text += t('status.measured', { ago: relativeTime(aircraftObservedAt) });
+      if (id === 'satellites' && satellites.visibleCount === 0 && satellites.data.length > 0) text = t('status.computing');
+      if (id === 'plates') text = t('status.plates');
     }
     el.className = `layer-status ${cls}`;
     el.textContent = text;
@@ -388,7 +375,7 @@ if (initialView.minMagnitude) {
 const timeline = new Timeline();
 const timelineEl = $('timeline');
 const tlRange = $<HTMLInputElement>('tl-range');
-const tlDateFmt = new Intl.DateTimeFormat('tr-TR', { day: 'numeric', month: 'short', hour: '2-digit', minute: '2-digit' });
+const tlDateFmt = new Intl.DateTimeFormat(locale, { day: 'numeric', month: 'short', hour: '2-digit', minute: '2-digit' });
 let timelineOpen = false;
 let tlLabelAt = 0;
 
@@ -405,14 +392,14 @@ function renderTimeline() {
   quakes.setTimeCursor(timeline.cursor, Math.max(600, timeline.span / 1000 / 12));
   tlRange.value = String(Math.round(timeline.fraction * 1000));
   timelineEl.classList.toggle('playing', timeline.playing);
-  $('tl-play').setAttribute('aria-label', timeline.playing ? 'Duraklat' : 'Oynat');
+  $('tl-play').setAttribute('aria-label', timeline.playing ? t('tl.pause') : t('tl.play'));
   $('tl-time').textContent = tlDateFmt.format(timeline.cursor);
-  $('tl-count').textContent = `${num(quakes.countAtCursor)} deprem`;
+  $('tl-count').textContent = t('tl.count', { n: num(quakes.countAtCursor) });
 }
 
 function openTimeline() {
   if (!quakes.timeRange) {
-    toast($('toasts'), 'Deprem verisi henüz yüklenmedi.', 'info');
+    toast($('toasts'), t('tl.noData'), 'info');
     return;
   }
   timelineOpen = true;
@@ -491,7 +478,7 @@ const layersVisible = () =>
   narrowScreen.matches ? layersPanel.classList.contains('open') : !layersPanel.classList.contains('collapsed');
 function syncLayersButton() {
   const open = layersVisible();
-  const label = open ? 'Katmanlar panelini gizle' : 'Katmanlar panelini göster';
+  const label = open ? t('layers.hide') : t('layers.show');
   layersBtn.setAttribute('aria-expanded', String(open));
   layersBtn.setAttribute('aria-label', label);
   layersBtn.title = label;
@@ -594,7 +581,7 @@ container.addEventListener('pointermove', (e) => {
     const hit = pickAt(ev.clientX, ev.clientY);
     container.classList.toggle('hovering', Boolean(hit));
     if (hit) {
-      tooltip.innerHTML = `<b>${LAYER_NAMES[hit.layer].tag}</b>`;
+      tooltip.innerHTML = `<b>${layerTag(hit.layer)}</b>`;
       tooltip.append(layers[hit.layer].label(hit.index));
       tooltip.style.left = `${ev.clientX}px`;
       tooltip.style.top = `${ev.clientY}px`;
@@ -698,7 +685,7 @@ function plateInfo(idx: number): PlateBoundaryInfo {
     lengthKm: boundaryLengthKm(line.c),
     nearbyQuakes: near.length,
     strongest: strongest ? { magnitude: strongest.magnitude, place: strongest.place } : null,
-    feedLabel: QUAKE_FEEDS[quakeFeedSel.value as keyof typeof QUAKE_FEEDS],
+    feedLabel: t(`feed.${quakeFeedSel.value}` as Key),
     minMagnitude: Number(quakeMin.value),
   };
 }
@@ -755,17 +742,17 @@ function setObserver(o: Observer) {
 
 function locateObserver() {
   if (!('geolocation' in navigator)) {
-    toast($('toasts'), 'Tarayıcınız konum paylaşmayı desteklemiyor; bir şehir arayabilirsiniz.', 'info');
+    toast($('toasts'), t('geo.unsupported'), 'info');
     return;
   }
   navigator.geolocation.getCurrentPosition(
     (pos) => {
-      setObserver({ lat: pos.coords.latitude, lon: pos.coords.longitude, elevationM: pos.coords.altitude ?? 0, name: 'Konumunuz' });
-      toast($('toasts'), 'Konumunuz yalnızca bu cihazda, geçiş hesabı için kullanılıyor.', 'info', 4000);
+      setObserver({ lat: pos.coords.latitude, lon: pos.coords.longitude, elevationM: pos.coords.altitude ?? 0, name: t('geo.yours') });
+      toast($('toasts'), t('geo.privacy'), 'info', 4000);
     },
     (err) => {
-      const msg = err.code === err.PERMISSION_DENIED ? 'Konum izni verilmedi' : 'Konum alınamadı';
-      toast($('toasts'), `${msg}; bunun yerine yukarıdan bir şehir arayabilirsiniz.`, 'info');
+      const msg = err.code === err.PERMISSION_DENIED ? t('geo.denied') : t('geo.failed');
+      toast($('toasts'), t('geo.alternative', { msg }), 'info');
     },
     { enableHighAccuracy: false, timeout: 10_000, maximumAge: 600_000 },
   );
@@ -815,7 +802,7 @@ async function shareCurrentView() {
   const url = location.href;
   const sel = selection?.kind === 'layer' ? selection : null;
   const label = sel ? layers[sel.layer].label(layers[sel.layer].indexOfKey(sel.key)) : null;
-  const text = label ? `EARTH LIVE'da şuna bak: ${label}` : "EARTH LIVE'da Dünya'yı canlı izle";
+  const text = label ? t('share.text', { label }) : t('share.default');
   if (navigator.share && matchMedia('(pointer: coarse)').matches) {
     try {
       await navigator.share({ title: 'EARTH LIVE', text, url });
@@ -826,9 +813,9 @@ async function shareCurrentView() {
   }
   try {
     await navigator.clipboard.writeText(url);
-    toast($('toasts'), 'Bağlantı kopyalandı — açan kişi tam olarak bu görünümü görecek.', 'info', 4000);
+    toast($('toasts'), t('share.copied'), 'info', 4000);
   } catch {
-    toast($('toasts'), `Bağlantı: ${url}`, 'info', 12000);
+    toast($('toasts'), t('share.link', { url }), 'info', 12000);
   }
 }
 $('share-view').addEventListener('click', () => void shareCurrentView());
@@ -875,7 +862,7 @@ searchInput.addEventListener('input', () => {
     } catch (err) {
       if ((err as Error).name === 'AbortError') return;
       showResults(objectMatches(q), false);
-      toast($('toasts'), `Yer araması başarısız: ${(err as Error).message}`);
+      toast($('toasts'), t('search.failed', { msg: (err as Error).message }));
     }
   }, 250);
 });
@@ -895,7 +882,7 @@ function chooseResult(item: SearchItem | undefined) {
   searchInput.blur();
   const idx = layers[item.layer].indexOfKey(item.key);
   if (idx < 0) {
-    toast($('toasts'), `${item.title} artık listede yok.`, 'info');
+    toast($('toasts'), t('search.gone', { name: item.title }), 'info');
     return;
   }
   // katman kapalıysa aç: seçilen nesne görünmeli
@@ -1044,7 +1031,7 @@ let lastAircraftDetail = 0;
 function slowTick(now: number) {
   const d = new Date(now);
   $('clock-utc').textContent = `${d.toISOString().slice(11, 19)} UTC`;
-  $('clock-local').textContent = d.toLocaleString('tr-TR', { weekday: 'short', day: '2-digit', month: 'short', hour: '2-digit', minute: '2-digit' });
+  $('clock-local').textContent = d.toLocaleString(locale, { weekday: 'short', day: '2-digit', month: 'short', hour: '2-digit', minute: '2-digit' });
   const altKm = (globe.camera.position.length() - 1) * EARTH_RADIUS_KM;
   $('hud-alt').textContent = `${num(altKm)} km`;
   const sun = globe.subsolar;
@@ -1098,7 +1085,7 @@ installBtn.addEventListener('click', async () => {
   const { outcome } = await installPrompt.userChoice;
   installPrompt = null;
   installBtn.hidden = true;
-  if (outcome === 'accepted') toast($('toasts'), 'EARTH LIVE uygulama olarak yüklendi.', 'info', 4000);
+  if (outcome === 'accepted') toast($('toasts'), t('app.installed'), 'info', 4000);
 });
 window.addEventListener('appinstalled', () => {
   installPrompt = null;

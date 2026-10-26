@@ -5,6 +5,7 @@
  * - OpenSky tarayıcıdan erişime izin vermez → uçak verisi ve uydu TLE'leri, GitHub Actions'ın
  *   düzenli olarak güncellediği "data" dalından (raw.githubusercontent.com) okunur.
  */
+import { lang } from '../i18n.ts';
 import {
   celestrakUrl,
   EONET_URL,
@@ -150,7 +151,7 @@ async function events(): Promise<ApiEnvelope<NaturalEvent[]>> {
 
 async function geocode(q: string, signal?: AbortSignal): Promise<ApiEnvelope<GeocodeResult[]>> {
   return direct('geocode', 'Open-Meteo Geocoding (GeoNames)', GEOCODE_URL, 86400, async () =>
-    parseGeocode(await (await request(geocodeUrl(q, 'tr'), signal)).json()),
+    parseGeocode(await (await request(geocodeUrl(q, lang), signal)).json()),
   );
 }
 

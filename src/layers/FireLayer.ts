@@ -1,4 +1,6 @@
 import * as THREE from 'three';
+import { t } from '../i18n.ts';
+import { num } from '../lib/format.ts';
 import { latLonToVec3 } from '../lib/geo.ts';
 import { FRP_STOPS, stopColor } from '../lib/scales.ts';
 import type { Fire } from '../lib/types.ts';
@@ -151,7 +153,7 @@ export class FireLayer implements Layer {
 
   label(i: number) {
     const f = this.items[i];
-    return f ? `Aktif yangın · ${f.frp.toFixed(1)} MW` : '';
+    return f ? t('fire.label', { frp: num(f.frp, 1) }) : '';
   }
 
   keyOf(i: number) {

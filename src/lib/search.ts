@@ -1,4 +1,6 @@
 /** Arama kutusunda uçak ve uydu eşleştirme (yer araması Open-Meteo'dan ayrıca gelir). */
+import { t } from '../i18n.ts';
+import { num } from './format.ts';
 import type { Aircraft, SatelliteTle } from './types.ts';
 
 export interface ObjectMatch {
@@ -34,7 +36,7 @@ export function matchAircraft(list: readonly Aircraft[], query: string, limit = 
       layer: 'aircraft',
       key: a.icao24,
       title: a.callsign ?? a.icao24.toUpperCase(),
-      sub: `${a.country} · ${a.onGround ? 'yerde' : a.altitudeM !== null ? `${Math.round(a.altitudeM * 3.28084).toLocaleString('tr-TR')} ft` : 'havada'}`,
+      sub: `${a.country} · ${a.onGround ? t('search.onGround') : a.altitudeM !== null ? `${num(a.altitudeM * 3.28084)} ft` : t('search.airborne')}`,
     }));
 }
 

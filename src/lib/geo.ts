@@ -5,6 +5,7 @@
  *   +Y = Kuzey kutbu, +X = (0°, 0°), -Z = (0°, 90°D)
  * Bu eşleme three.js SphereGeometry'nin eşdikdörtgen UV düzeniyle birebir örtüşür.
  */
+import { t } from '../i18n.ts';
 
 export const EARTH_RADIUS_KM = 6371.0088;
 const DEG = Math.PI / 180;
@@ -87,9 +88,9 @@ export function isOccludedByEarth(cam: Vec3Like, p: Vec3Like, radius = 1): boole
 }
 
 export function formatLat(lat: number, digits = 3): string {
-  return `${Math.abs(lat).toFixed(digits)}° ${lat >= 0 ? 'K' : 'G'}`;
+  return `${Math.abs(lat).toFixed(digits)}° ${t(lat >= 0 ? 'dir.N' : 'dir.S')}`;
 }
 
 export function formatLon(lon: number, digits = 3): string {
-  return `${Math.abs(lon).toFixed(digits)}° ${lon >= 0 ? 'D' : 'B'}`;
+  return `${Math.abs(lon).toFixed(digits)}° ${t(lon >= 0 ? 'dir.E' : 'dir.W')}`;
 }

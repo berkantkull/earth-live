@@ -8,6 +8,7 @@ import type {
   SatelliteTle,
   SourceMetaDto,
 } from '../lib/types.ts';
+import { lang } from '../i18n.ts';
 import { staticApi } from './staticApi.ts';
 
 export class ApiError extends Error {
@@ -41,7 +42,7 @@ const serverApi = {
   fires: () => getJson<ApiEnvelope<Fire[]>>('/api/fires'),
   events: () => getJson<ApiEnvelope<NaturalEvent[]>>('/api/events'),
   geocode: (q: string, signal?: AbortSignal) =>
-    getJson<ApiEnvelope<GeocodeResult[]>>(`/api/geocode?q=${encodeURIComponent(q)}&lang=tr`, signal),
+    getJson<ApiEnvelope<GeocodeResult[]>>(`/api/geocode?q=${encodeURIComponent(q)}&lang=${lang}`, signal),
   status: () => getJson<{ time: number; openskyAuthenticated: boolean; sources: SourceMetaDto[] }>('/api/status'),
 };
 

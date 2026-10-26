@@ -1,29 +1,39 @@
+import { t, type Key } from '../i18n.ts';
 import { escapeHtml, num, relativeTime, utcString } from '../lib/format.ts';
 import { ALTITUDE_STOPS, DEPTH_STOPS, EVENT_COLORS, FRP_STOPS, ORBIT_COLORS, PLATE_COLORS } from '../lib/scales.ts';
-import type { GeocodeResult, SourceMetaDto } from '../lib/types.ts';
+import { QUAKE_FEEDS, SATELLITE_GROUPS, type GeocodeResult, type SourceMetaDto } from '../lib/types.ts';
 import { formatLat, formatLon } from '../lib/geo.ts';
 import type { ObjectMatch } from '../lib/search.ts';
 
-const STATUS_LABEL: Record<string, string> = {
-  ok: 'Güncel',
-  stale: 'Bayat veri',
-  error: 'Hata',
-  idle: 'Henüz istenmedi',
-};
+const statusLabel = (s: string) =>
+  ['ok', 'stale', 'error', 'idle'].includes(s) ? t(`sources.st.${s}` as Key) : s;
+
+/** Kaynak adı arayüz dilinde; sunucunun gönderdiği ad yalnızca bilinmeyen kaynaklar için kullanılır */
+export function sourceName(s: SourceMetaDto): string {
+  const [kind, arg] = s.id.split(':');
+  if (kind === 'earthquakes' && arg && arg in QUAKE_FEEDS) return t('src.earthquakes', { feed: t(`feed.${arg}` as Key) });
+  if (kind === 'satellites' && arg && arg in SATELLITE_GROUPS) {
+    return s.url.includes('satnogs') ? t('src.satnogs') : t('src.satellites', { group: t(`group.${arg}` as Key) });
+  }
+  if (['aircraft', 'fires', 'events', 'geocode', 'plates'].includes(kind)) return t(`src.${kind}` as Key);
+  return s.name;
+}
 
 export function renderSources(el: HTMLElement, sources: SourceMetaDto[], openskyAuth: boolean) {
   const rows = sources
     .map((s) => {
+      const cache =
+        s.ttlSeconds >= 3600 ? t('sources.hours', { n: num(s.ttlSeconds / 3600, 0) }) : t('sources.seconds', { n: s.ttlSeconds });
       const meta = [
-        `Durum: ${STATUS_LABEL[s.status] ?? s.status}`,
-        s.fetchedAt ? `Son veri: ${relativeTime(s.fetchedAt)} · ${utcString(s.fetchedAt)}` : 'Son veri: —',
-        s.nextRefreshAt && s.nextRefreshAt > Date.now() ? `Sonraki yenileme: ${relativeTime(s.nextRefreshAt)}` : '',
-        `Önbellek: ${s.ttlSeconds >= 3600 ? `${num(s.ttlSeconds / 3600, 0)} sa` : `${s.ttlSeconds} sn`}`,
+        t('sources.state', { s: statusLabel(s.status) }),
+        s.fetchedAt ? t('sources.last', { ago: relativeTime(s.fetchedAt), utc: utcString(s.fetchedAt) }) : t('sources.lastNone'),
+        s.nextRefreshAt && s.nextRefreshAt > Date.now() ? t('sources.next', { in: relativeTime(s.nextRefreshAt) }) : '',
+        s.ttlSeconds > 0 ? t('sources.cache', { v: cache }) : '',
       ].filter(Boolean);
       return `
         <div class="src-row">
           <span class="dot ${s.status}"></span>
-          <strong>${escapeHtml(s.name)}</strong>
+          <strong>${escapeHtml(sourceName(s))}</strong>
           <span class="src-count">${s.count !== null ? num(s.count) : ''}</span>
           <div class="src-meta">${meta.map((m) => `<span>${m}</span>`).join('')}<a href="${escapeHtml(s.url)}" target="_blank" rel="noopener">${escapeHtml(s.url)}</a></div>
           ${s.error ? `<div class="src-err">⚠ ${escapeHtml(s.error)}</div>` : ''}
@@ -31,18 +41,13 @@ export function renderSources(el: HTMLElement, sources: SourceMetaDto[], opensky
     })
     .join('');
   el.innerHTML = `${rows}
-    <div class="src-note">
-      Tüm upstream istekleri EARTH LIVE sunucusu üzerinden önbelleğe alınarak yapılır.
-      OpenSky erişimi: ${openskyAuth ? 'kimlikli (OAuth2)' : 'anonim — günlük kredi sınırlı; .env ile OPENSKY_CLIENT_ID/SECRET tanımlanabilir'}.
-      Uydu konumları SGP4 ile istemcide hesaplanır. Plaka sınırları: Bird (2003) PB2002 (ODC-By 1.0).
-      Dokular: Solar System Scope (CC BY 4.0), NASA Blue Marble / Black Marble türevleri.
-    </div>`;
+    <div class="src-note">${t('sources.note', { auth: openskyAuth ? t('sources.auth.yes') : t('sources.auth.no') })}</div>`;
 }
 
 export function renderSourcesSummary(el: HTMLElement, sources: SourceMetaDto[]) {
   el.innerHTML = sources
     .filter((s) => s.id !== 'geocode' || s.status !== 'idle')
-    .map((s) => `<i class="${s.status}" title="${escapeHtml(s.name)}: ${STATUS_LABEL[s.status]}"></i>`)
+    .map((s) => `<i class="${s.status}" title="${escapeHtml(sourceName(s))}: ${statusLabel(s.status)}"></i>`)
     .join('');
 }
 
@@ -53,24 +58,28 @@ export function renderLegend(el: HTMLElement) {
       <ul>${items.map((i) => `<li><i style="background:${i.color}"></i>${i.label}</li>`).join('')}</ul>
     </div>`;
   el.innerHTML = [
-    group('earthquakes', 'Deprem derinliği', DEPTH_STOPS),
-    group('aircraft', 'Uçak irtifası', ALTITUDE_STOPS),
-    group('satellites', 'Yörünge sınıfı', [
-      { color: ORBIT_COLORS.LEO, label: 'LEO < 2.000 km' },
+    group('earthquakes', t('legend.depth'), DEPTH_STOPS),
+    group(
+      'aircraft',
+      t('legend.altitude'),
+      ALTITUDE_STOPS.map((s, i) => (i === 0 ? { ...s, label: t('legend.onGround') } : s)),
+    ),
+    group('satellites', t('legend.orbit'), [
+      { color: ORBIT_COLORS.LEO, label: t('legend.leo') },
       { color: ORBIT_COLORS.MEO, label: 'MEO' },
-      { color: ORBIT_COLORS.GEO, label: 'GEO ≈ 35.786 km' },
-      { color: ORBIT_COLORS.HEO, label: 'HEO (eliptik)' },
+      { color: ORBIT_COLORS.GEO, label: t('legend.geo') },
+      { color: ORBIT_COLORS.HEO, label: t('legend.heo') },
     ]),
-    group('plates', 'Plaka sınırı', [
-      { color: PLATE_COLORS.subduction, label: 'Dalma-batma' },
-      { color: PLATE_COLORS.boundary, label: 'Diğer sınırlar' },
+    group('plates', t('legend.plates'), [
+      { color: PLATE_COLORS.subduction, label: t('legend.subduction') },
+      { color: PLATE_COLORS.boundary, label: t('legend.otherBoundary') },
     ]),
-    group('fires', 'Yangın gücü', FRP_STOPS),
-    group('events', 'Doğal olay', [
-      { color: EVENT_COLORS.volcanoes, label: 'Volkan' },
-      { color: EVENT_COLORS.severeStorms, label: 'Fırtına' },
-      { color: EVENT_COLORS.seaLakeIce, label: 'Buz / buzdağı' },
-      { color: EVENT_COLORS.default, label: 'Diğer' },
+    group('fires', t('legend.fires'), FRP_STOPS),
+    group('events', t('legend.events'), [
+      { color: EVENT_COLORS.volcanoes, label: t('cat.volcanoes') },
+      { color: EVENT_COLORS.severeStorms, label: t('legend.storm') },
+      { color: EVENT_COLORS.seaLakeIce, label: t('legend.ice') },
+      { color: EVENT_COLORS.default, label: t('legend.other') },
     ]),
   ].join('');
 }
@@ -83,20 +92,19 @@ export type SearchItem = { kind: 'place'; place: GeocodeResult } | ({ kind: 'obj
 
 export function renderSearchResults(ul: HTMLElement, results: SearchItem[], active: number, placesPending = false) {
   if (results.length === 0) {
-    ul.innerHTML = `<li class="r-empty">${placesPending ? 'Aranıyor…' : 'Sonuç bulunamadı'}</li>`;
+    ul.innerHTML = `<li class="r-empty">${placesPending ? t('search.searching') : t('search.none')}</li>`;
     return;
   }
   ul.innerHTML = results
     .map((r, i) => {
       if (r.kind === 'object') {
-        const tag = r.layer === 'aircraft' ? 'UÇAK' : 'UYDU';
         return `
       <li role="option" data-index="${i}" aria-selected="${i === active}">
         <div>
           <div class="r-name">${escapeHtml(r.title)}</div>
           <div class="r-sub">${escapeHtml(r.sub)}</div>
         </div>
-        <span class="r-tag ${r.layer}">${tag}</span>
+        <span class="r-tag ${r.layer}">${t(`search.tag.${r.layer}`)}</span>
       </li>`;
       }
       const p = r.place;
@@ -114,7 +122,7 @@ export function renderSearchResults(ul: HTMLElement, results: SearchItem[], acti
 
 export function toast(container: HTMLElement, message: string, kind: 'error' | 'info' = 'error', ms = 6000) {
   // aynı mesaj zaten görünüyorsa tekrar etme
-  for (const t of container.children) if (t.textContent === message) return;
+  for (const el of container.children) if (el.textContent === message) return;
   const el = document.createElement('div');
   el.className = `toast ${kind === 'info' ? 'info' : ''}`;
   el.textContent = message;

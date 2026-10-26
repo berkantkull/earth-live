@@ -157,6 +157,7 @@ button, input, select { font: inherit; color: inherit; }
 }
 .icon-btn svg { width: 18px; height: 18px; fill: none; stroke: currentColor; stroke-width: 1.8; stroke-linejoin: round; }
 .icon-btn:hover { border-color: var(--accent); }
+.lang-btn { font: 700 11.5px/1 var(--mono); letter-spacing: 0.06em; color: var(--text); }
 .icon-btn:focus-visible { outline: none; box-shadow: 0 0 0 3px var(--accent-soft); border-color: var(--accent); }
 /* panel açıkken katman düğmesi vurgulu */
 .icon-btn[aria-expanded='true'] { color: var(--accent); border-color: rgba(90, 209, 255, 0.5); background: rgba(90, 209, 255, 0.1); }

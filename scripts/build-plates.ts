@@ -30,7 +30,11 @@ const boundaries = JSON.parse(await readFile('assets-src/plates/PB2002_boundarie
 };
 
 const names: Record<string, string> = {};
-for (const f of plates.features) names[f.properties.Code] = TR[f.properties.PlateName] ?? f.properties.PlateName;
+const namesEn: Record<string, string> = {};
+for (const f of plates.features) {
+  names[f.properties.Code] = TR[f.properties.PlateName] ?? f.properties.PlateName;
+  namesEn[f.properties.Code] = f.properties.PlateName;
+}
 
 const r3 = (n: number) => Math.round(n * 1000) / 1000;
 const lines = boundaries.features.map((f) => ({
@@ -41,6 +45,6 @@ const lines = boundaries.features.map((f) => ({
   c: f.geometry.coordinates.flatMap(([lon, lat]) => [r3(lat), r3(lon)]),
 }));
 
-const json = JSON.stringify({ names, lines });
+const json = JSON.stringify({ names, namesEn, lines });
 await writeFile('public/data/plates.json', json);
 console.log(`public/data/plates.json — ${lines.length} sınır, ${(json.length / 1024).toFixed(0)} KB`);

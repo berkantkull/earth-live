@@ -14,7 +14,10 @@ export interface PlateBoundary {
 }
 
 export interface PlateData {
+  /** Türkçe plaka adları */
   names: Record<string, string>;
+  /** özgün (İngilizce) plaka adları */
+  namesEn?: Record<string, string>;
   lines: PlateBoundary[];
 }
 

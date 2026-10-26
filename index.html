@@ -43,7 +43,7 @@
   </head>
   <body>
     <div id="app">
-      <div id="globe" aria-label="3B Dünya görünümü"></div>
+      <div id="globe" data-i18n-attr="aria-label:app.globe" aria-label="3B Dünya görünümü"></div>
       <div class="vignette" aria-hidden="true"></div>
 
       <header class="topbar">
@@ -56,7 +56,7 @@
           </svg>
           <div>
             <h1>EARTH LIVE</h1>
-            <p>Global Observation &amp; Monitoring System</p>
+            <p data-i18n="app.subtitle">Global Observation &amp; Monitoring System</p>
           </div>
         </div>
 
@@ -65,6 +65,7 @@
           <input
             id="search-input"
             type="search"
+            data-i18n-attr="placeholder:search.placeholder;aria-label:search.label"
             placeholder="Şehir, uçuş (THY) veya uydu (ISS) ara…"
             autocomplete="off"
             spellcheck="false"
@@ -77,17 +78,18 @@
         </div>
 
         <div class="topbar-right">
-          <button class="icon-btn" id="install-app" aria-label="Uygulamayı yükle" title="Uygulamayı yükle" hidden>
+          <button class="icon-btn" id="install-app" data-i18n-attr="aria-label:app.install;title:app.install" aria-label="Uygulamayı yükle" title="Uygulamayı yükle" hidden>
             <svg viewBox="0 0 24 24"><path d="M12 4v11M7.5 10.5 12 15l4.5-4.5" /><path d="M5 19h14" /></svg>
           </button>
-          <button class="icon-btn" id="share-view" aria-label="Bu görünümü paylaş" title="Bu görünümü paylaş">
+          <button class="icon-btn lang-btn" id="lang-toggle" type="button" data-i18n-attr="aria-label:app.language;title:app.language" aria-label="Dil" title="Dil">EN</button>
+          <button class="icon-btn" id="share-view" data-i18n-attr="aria-label:app.shareView;title:app.shareView" aria-label="Bu görünümü paylaş" title="Bu görünümü paylaş">
             <svg viewBox="0 0 24 24"><circle cx="18" cy="5" r="2.5" /><circle cx="6" cy="12" r="2.5" /><circle cx="18" cy="19" r="2.5" /><path d="m8.2 10.8 7.6-4.5M8.2 13.2l7.6 4.5" /></svg>
           </button>
           <button class="icon-btn" id="toggle-layers" aria-controls="layers-panel" aria-expanded="true" aria-label="Katmanlar panelini gizle" title="Katmanlar panelini gizle">
             <svg viewBox="0 0 24 24"><path d="m12 3 9 5-9 5-9-5 9-5Z" /><path d="m3 13 9 5 9-5" /></svg>
           </button>
           <div class="clock">
-            <div class="live-badge"><span class="pulse-dot"></span>CANLI</div>
+            <div class="live-badge"><span class="pulse-dot"></span><span data-i18n="app.live">CANLI</span></div>
             <div class="clock-times">
               <span id="clock-utc">--:--:-- UTC</span>
               <span id="clock-local" class="muted">--</span>
@@ -96,127 +98,127 @@
         </div>
       </header>
 
-      <aside class="panel layers-panel" id="layers-panel" aria-label="Gözlem katmanları">
-        <div class="panel-heading">Gözlem katmanları</div>
+      <aside class="panel layers-panel" id="layers-panel" data-i18n-attr="aria-label:layers.heading" aria-label="Gözlem katmanları">
+        <div class="panel-heading" data-i18n="layers.heading">Gözlem katmanları</div>
 
         <section class="layer-card" data-layer="earthquakes">
           <header>
             <span class="layer-icon quake" aria-hidden="true"></span>
             <div class="layer-name">
-              <strong>Depremler</strong>
-              <small>USGS · sismik ağ</small>
+              <strong data-i18n="layer.earthquakes">Depremler</strong>
+              <small data-i18n="layer.earthquakes.sub">USGS · sismik ağ</small>
             </div>
             <span class="layer-count" id="count-earthquakes">—</span>
-            <label class="switch"><input type="checkbox" id="toggle-earthquakes" checked /><span></span><em class="sr">Depremler</em></label>
+            <label class="switch"><input type="checkbox" id="toggle-earthquakes" checked /><span></span><em class="sr" data-i18n="layer.earthquakes">Depremler</em></label>
           </header>
           <div class="layer-body">
             <label class="field">
-              <span>Zaman aralığı</span>
+              <span data-i18n="quake.feed">Zaman aralığı</span>
               <select id="quake-feed"></select>
             </label>
             <label class="field">
-              <span>Min. büyüklük <output id="quake-min-out">M0.0</output></span>
+              <span><span data-i18n="quake.minMag">Min. büyüklük</span> <output id="quake-min-out">M0.0</output></span>
               <input type="range" id="quake-min" min="0" max="7" step="0.5" value="0" />
             </label>
             <button class="btn replay-btn" id="quake-replay" type="button">
               <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M8 5v14l11-7z" /></svg>
-              Zaman çizelgesinde oynat
+              <span data-i18n="quake.replay">Zaman çizelgesinde oynat</span>
             </button>
           </div>
-          <footer class="layer-status" id="status-earthquakes">Bekleniyor…</footer>
+          <footer class="layer-status" id="status-earthquakes" data-i18n="status.waiting">Bekleniyor…</footer>
         </section>
 
         <section class="layer-card" data-layer="aircraft">
           <header>
             <span class="layer-icon aircraft" aria-hidden="true"></span>
             <div class="layer-name">
-              <strong>Uçaklar</strong>
-              <small>OpenSky · ADS-B</small>
+              <strong data-i18n="layer.aircraft">Uçaklar</strong>
+              <small data-i18n="layer.aircraft.sub">OpenSky · ADS-B</small>
             </div>
             <span class="layer-count" id="count-aircraft">—</span>
-            <label class="switch"><input type="checkbox" id="toggle-aircraft" checked /><span></span><em class="sr">Uçaklar</em></label>
+            <label class="switch"><input type="checkbox" id="toggle-aircraft" checked /><span></span><em class="sr" data-i18n="layer.aircraft">Uçaklar</em></label>
           </header>
           <div class="layer-body">
             <label class="check">
               <input type="checkbox" id="aircraft-ground" />
-              <span>Yerdeki uçakları göster</span>
+              <span data-i18n="aircraft.showGround">Yerdeki uçakları göster</span>
             </label>
           </div>
-          <footer class="layer-status" id="status-aircraft">Bekleniyor…</footer>
+          <footer class="layer-status" id="status-aircraft" data-i18n="status.waiting">Bekleniyor…</footer>
         </section>
 
         <section class="layer-card" data-layer="satellites">
           <header>
             <span class="layer-icon satellite" aria-hidden="true"></span>
             <div class="layer-name">
-              <strong>Uydular</strong>
-              <small>CelesTrak · SGP4</small>
+              <strong data-i18n="layer.satellites">Uydular</strong>
+              <small data-i18n="layer.satellites.sub">CelesTrak · SGP4</small>
             </div>
             <span class="layer-count" id="count-satellites">—</span>
-            <label class="switch"><input type="checkbox" id="toggle-satellites" checked /><span></span><em class="sr">Uydular</em></label>
+            <label class="switch"><input type="checkbox" id="toggle-satellites" checked /><span></span><em class="sr" data-i18n="layer.satellites">Uydular</em></label>
           </header>
           <div class="layer-body">
             <label class="field">
-              <span>Uydu grubu</span>
+              <span data-i18n="sat.group">Uydu grubu</span>
               <select id="sat-group"></select>
             </label>
           </div>
-          <footer class="layer-status" id="status-satellites">Bekleniyor…</footer>
+          <footer class="layer-status" id="status-satellites" data-i18n="status.waiting">Bekleniyor…</footer>
         </section>
 
         <section class="layer-card" data-layer="plates">
           <header>
             <span class="layer-icon plates" aria-hidden="true"></span>
             <div class="layer-name">
-              <strong>Tektonik plakalar</strong>
-              <small>PB2002 · Bird (2003)</small>
+              <strong data-i18n="layer.plates">Tektonik plakalar</strong>
+              <small data-i18n="layer.plates.sub">PB2002 · Bird (2003)</small>
             </div>
             <span class="layer-count" id="count-plates">—</span>
-            <label class="switch"><input type="checkbox" id="toggle-plates" checked /><span></span><em class="sr">Tektonik plakalar</em></label>
+            <label class="switch"><input type="checkbox" id="toggle-plates" checked /><span></span><em class="sr" data-i18n="layer.plates">Tektonik plakalar</em></label>
           </header>
-          <footer class="layer-status" id="status-plates">Bekleniyor…</footer>
+          <footer class="layer-status" id="status-plates" data-i18n="status.waiting">Bekleniyor…</footer>
         </section>
 
         <section class="layer-card" data-layer="fires">
           <header>
             <span class="layer-icon fires" aria-hidden="true"></span>
             <div class="layer-name">
-              <strong>Aktif yangınlar</strong>
-              <small>NASA FIRMS · MODIS 24 sa</small>
+              <strong data-i18n="layer.fires">Aktif yangınlar</strong>
+              <small data-i18n="layer.fires.sub">NASA FIRMS · MODIS 24 sa</small>
             </div>
             <span class="layer-count" id="count-fires">—</span>
-            <label class="switch"><input type="checkbox" id="toggle-fires" checked /><span></span><em class="sr">Aktif yangınlar</em></label>
+            <label class="switch"><input type="checkbox" id="toggle-fires" checked /><span></span><em class="sr" data-i18n="layer.fires">Aktif yangınlar</em></label>
           </header>
-          <footer class="layer-status" id="status-fires">Bekleniyor…</footer>
+          <footer class="layer-status" id="status-fires" data-i18n="status.waiting">Bekleniyor…</footer>
         </section>
 
         <section class="layer-card" data-layer="events">
           <header>
             <span class="layer-icon events" aria-hidden="true"></span>
             <div class="layer-name">
-              <strong>Doğal olaylar</strong>
-              <small>NASA EONET · volkan, fırtına, buz</small>
+              <strong data-i18n="layer.events">Doğal olaylar</strong>
+              <small data-i18n="layer.events.sub">NASA EONET · volkan, fırtına, buz</small>
             </div>
             <span class="layer-count" id="count-events">—</span>
-            <label class="switch"><input type="checkbox" id="toggle-events" checked /><span></span><em class="sr">Doğal olaylar</em></label>
+            <label class="switch"><input type="checkbox" id="toggle-events" checked /><span></span><em class="sr" data-i18n="layer.events">Doğal olaylar</em></label>
           </header>
-          <footer class="layer-status" id="status-events">Bekleniyor…</footer>
+          <footer class="layer-status" id="status-events" data-i18n="status.waiting">Bekleniyor…</footer>
         </section>
 
-        <div class="panel-heading">Görünüm</div>
+        <div class="panel-heading" data-i18n="layers.view">Görünüm</div>
         <div class="view-options">
-          <label class="check"><input type="checkbox" id="opt-rotate" checked /><span>Otomatik dönüş</span></label>
-          <label class="check"><input type="checkbox" id="opt-lighting" checked /><span>Gerçek gün/gece aydınlatması</span></label>
-          <label class="check"><input type="checkbox" id="opt-clouds" checked /><span>Bulut katmanı</span></label>
-          <label class="check"><input type="checkbox" id="opt-atmosphere" checked /><span>Atmosfer</span></label>
+          <label class="check"><input type="checkbox" id="opt-rotate" checked /><span data-i18n="view.rotate">Otomatik dönüş</span></label>
+          <label class="check"><input type="checkbox" id="opt-lighting" checked /><span data-i18n="view.lighting">Gerçek gün/gece aydınlatması</span></label>
+          <label class="check"><input type="checkbox" id="opt-clouds" checked /><span data-i18n="view.clouds">Bulut katmanı</span></label>
+          <label class="check"><input type="checkbox" id="opt-atmosphere" checked /><span data-i18n="view.atmosphere">Atmosfer</span></label>
         </div>
       </aside>
 
       <aside class="panel details-panel" id="details-panel" aria-live="polite" hidden>
-        <button class="close-btn share" id="details-share" aria-label="Paylaş" title="Bağlantıyı paylaş">
+        <button class="close-btn share" id="details-share" data-i18n-attr="aria-label:app.share;title:app.share" aria-label="Paylaş" title="Bağlantıyı paylaş">
           <svg viewBox="0 0 24 24"><circle cx="18" cy="5" r="2.5" /><circle cx="6" cy="12" r="2.5" /><circle cx="18" cy="19" r="2.5" /><path d="m8.2 10.8 7.6-4.5M8.2 13.2l7.6 4.5" /></svg>
         </button>
-        <button class="close-btn" id="details-close" aria-label="Kapat">
+        <button class="close-btn" id="details-close" data-i18n-attr="aria-label:app.close" aria-label="Kapat">
           <svg viewBox="0 0 24 24"><path d="M6 6l12 12M18 6 6 18" /></svg>
         </button>
         <div id="details-content"></div>
@@ -224,17 +226,17 @@
 
       <section class="panel sources-panel" id="sources-panel">
         <button class="sources-toggle" id="sources-toggle" aria-expanded="false" aria-controls="sources-body">
-          <span class="panel-heading">Veri kaynakları</span>
+          <span class="panel-heading" data-i18n="sources.heading">Veri kaynakları</span>
           <span class="sources-summary" id="sources-summary"></span>
           <svg class="chev" viewBox="0 0 24 24"><path d="m6 15 6-6 6 6" /></svg>
         </button>
         <div class="sources-body" id="sources-body" hidden></div>
       </section>
 
-      <div class="legend" id="legend" aria-label="Lejant"></div>
+      <div class="legend" id="legend" data-i18n-attr="aria-label:legend.label" aria-label="Lejant"></div>
 
-      <section class="panel timeline" id="timeline" aria-label="Deprem zaman çizelgesi" hidden>
-        <button class="tl-play" id="tl-play" type="button" aria-label="Oynat">
+      <section class="panel timeline" id="timeline" data-i18n-attr="aria-label:tl.label" aria-label="Deprem zaman çizelgesi" hidden>
+        <button class="tl-play" id="tl-play" type="button" data-i18n-attr="aria-label:tl.play" aria-label="Oynat">
           <svg class="i-play" viewBox="0 0 24 24" aria-hidden="true"><path d="M8 5v14l11-7z" /></svg>
           <svg class="i-pause" viewBox="0 0 24 24" aria-hidden="true"><path d="M7 5h4v14H7zM13 5h4v14h-4z" /></svg>
         </button>
@@ -243,30 +245,30 @@
             <span id="tl-time">—</span>
             <span id="tl-count" class="muted">—</span>
           </div>
-          <input type="range" id="tl-range" min="0" max="1000" value="1000" aria-label="Zaman" />
+          <input type="range" id="tl-range" min="0" max="1000" value="1000" data-i18n-attr="aria-label:tl.time" aria-label="Zaman" />
           <div class="tl-scale"><span id="tl-start">—</span><span id="tl-end">—</span></div>
         </div>
         <label class="tl-speed">
-          <span class="sr">Oynatma hızı</span>
+          <span class="sr" data-i18n="tl.speed">Oynatma hızı</span>
           <select id="tl-speed">
-            <option value="60">Yavaş</option>
-            <option value="20" selected>Normal</option>
-            <option value="8">Hızlı</option>
+            <option value="60" data-i18n="tl.slow">Yavaş</option>
+            <option value="20" selected data-i18n="tl.normal">Normal</option>
+            <option value="8" data-i18n="tl.fast">Hızlı</option>
           </select>
         </label>
-        <button class="close-btn tl-close" id="tl-close" type="button" aria-label="Zaman çizelgesini kapat">
+        <button class="close-btn tl-close" id="tl-close" type="button" data-i18n-attr="aria-label:tl.close" aria-label="Zaman çizelgesini kapat">
           <svg viewBox="0 0 24 24"><path d="M6 6l12 12M18 6 6 18" /></svg>
         </button>
       </section>
 
       <div class="hud" aria-live="off">
-        <div><span class="muted">İMLEÇ</span> <span id="hud-cursor">—</span></div>
-        <div><span class="muted">KAMERA İRTİFASI</span> <span id="hud-alt">—</span></div>
-        <div><span class="muted">GÜNEŞ-ALTI</span> <span id="hud-sun">—</span></div>
+        <div><span class="muted" data-i18n="hud.cursor">İMLEÇ</span> <span id="hud-cursor">—</span></div>
+        <div><span class="muted" data-i18n="hud.altitude">KAMERA İRTİFASI</span> <span id="hud-alt">—</span></div>
+        <div><span class="muted" data-i18n="hud.subsolar">GÜNEŞ-ALTI</span> <span id="hud-sun">—</span></div>
       </div>
 
       <footer class="copyright">
-        © <span id="copyright-year">2026</span> Berkant Kul · EARTH LIVE · Tüm hakları saklıdır.
+        © <span id="copyright-year">2026</span> Berkant Kul · EARTH LIVE · <span data-i18n="app.copyright">Tüm hakları saklıdır.</span>
       </footer>
 
       <div id="tooltip" role="tooltip" hidden></div>
@@ -277,11 +279,11 @@
         <div class="loader-inner">
           <div class="loader-orbit"><span></span></div>
           <h2>EARTH LIVE</h2>
-          <p id="loader-text">Gezegen dokuları yükleniyor…</p>
+          <p id="loader-text" data-i18n="app.loading">Gezegen dokuları yükleniyor…</p>
           <div class="loader-bar"><span id="loader-progress"></span></div>
         </div>
       </div>
-      <noscript>EARTH LIVE çalışmak için JavaScript ve WebGL gerektirir.</noscript>
+      <noscript>EARTH LIVE çalışmak için JavaScript ve WebGL gerektirir. / EARTH LIVE requires JavaScript and WebGL.</noscript>
     </div>
     <script type="module" src="/src/main.ts"></script>
   </body>
