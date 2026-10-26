@@ -14,6 +14,7 @@ import { EARTH_RADIUS_KM, formatLat, formatLon, isOccludedByEarth, latLonToVec3,
 import { num, relativeTime } from './lib/format.ts';
 import { predictPasses, type Observer, type Pass } from './lib/passes.ts';
 import { boundaryLengthKm, distanceToBoundaryKm, type PlateData } from './lib/plates.ts';
+import { pickAlert, type QuakeAlert } from './lib/alerts.ts';
 import { matchAircraft, matchSatellites } from './lib/search.ts';
 import { Timeline } from './lib/timeline.ts';
 import {
@@ -256,9 +257,8 @@ const statusPoller = new Poller(
 );
 let lastSources: SourceMetaDto[] = [];
 
+// Küçük ve her zaman gereken veriler hemen; uçak, uydu ve yangın verisi katman açılınca (ensureData)
 quakePoller.start();
-aircraftPoller.start();
-satellitePoller.start();
 statusPoller.start();
 
 // Tektonik plakalar: değişmeyen veri, sitenin kendi dosyasından bir kez yüklenir
@@ -308,8 +308,92 @@ const eventPoller = new Poller(
   },
   (e) => failed('events', e),
 );
-firePoller.start();
 eventPoller.start();
+
+/** Büyük veri setleri yalnızca gerektiğinde indirilir: katman açılınca ya da aramada */
+const lazyPollers: Partial<Record<LayerId, { start(): void; refresh(): void; stop(): void }>> = {
+  aircraft: aircraftPoller,
+  satellites: satellitePoller,
+  fires: firePoller,
+};
+const startedPollers = new Set<LayerId>();
+function ensureData(id: LayerId) {
+  const p = lazyPollers[id];
+  if (!p || startedPollers.has(id)) return;
+  startedPollers.add(id);
+  p.start();
+}
+
+// ---------------------------------------------------------------- önemli deprem uyarısı
+const ALERTS_SEEN_KEY = 'earthlive.alerts';
+const seenAlerts = new Set<string>(
+  (() => {
+    try {
+      return JSON.parse(localStorage.getItem(ALERTS_SEEN_KEY) ?? '[]') as string[];
+    } catch {
+      return [];
+    }
+  })(),
+);
+let activeAlert: QuakeAlert | null = null;
+
+function rememberAlert(id: string) {
+  seenAlerts.add(id);
+  try {
+    localStorage.setItem(ALERTS_SEEN_KEY, JSON.stringify([...seenAlerts].slice(-50)));
+  } catch {
+    // yalnızca bu oturumda hatırlanır
+  }
+}
+
+function showAlert(a: QuakeAlert) {
+  activeAlert = a;
+  rememberAlert(a.quake.id);
+  const el = $('quake-alert');
+  el.className = `quake-alert ${a.level}`;
+  $('qa-badge').textContent = t(`alert.${a.level}`);
+  $('qa-text').textContent = t('alert.text', {
+    mag: a.quake.magnitude.toFixed(1),
+    place: a.quake.place,
+    ago: relativeTime(a.quake.time),
+  });
+  el.hidden = false;
+  document.body.classList.add('has-alert');
+}
+
+function hideAlert() {
+  $('quake-alert').hidden = true;
+  document.body.classList.remove('has-alert');
+  activeAlert = null;
+}
+
+// Seçili katman ve zaman aralığından bağımsız: son 1 saatin tüm depremleri dakikada bir kontrol edilir
+const alertPoller = new Poller(
+  () => api.earthquakes('all_hour'),
+  60_000,
+  (r) => {
+    const a = pickAlert(r.data, Date.now(), seenAlerts);
+    if (a) showAlert(a);
+  },
+  () => {},
+);
+alertPoller.start();
+
+$('qa-close').addEventListener('click', hideAlert);
+$('qa-show').addEventListener('click', () => {
+  if (!activeAlert) return;
+  const q = activeAlert.quake;
+  hideAlert();
+  setLayerEnabled('earthquakes', true);
+  const idx = quakes.indexOfKey(q.id);
+  if (idx >= 0) {
+    selectLayerItem('earthquakes', idx);
+    pendingFly = true;
+  } else {
+    // seçili zaman aralığında yoksa yalnızca konuma git
+    globe.flyTo(q.lat, q.lon, 1.6);
+  }
+});
 
 // ---------------------------------------------------------------- katman kontrolleri
 function updateLayerStatus() {
@@ -320,7 +404,9 @@ function updateLayerStatus() {
     $(`count-${id}`).textContent = s.meta || layer.visibleCount ? num(layer.visibleCount) : '—';
     let cls = 'idle';
     let text = t('status.waiting');
-    if (s.loading && !s.meta) {
+    if (!$<HTMLInputElement>(`toggle-${id}`).checked && !s.meta) {
+      text = t('status.off');
+    } else if (s.loading && !s.meta) {
       cls = 'loading';
       text = t('status.loading');
     } else if (s.error && !s.meta) {
@@ -341,17 +427,69 @@ function updateLayerStatus() {
   document.querySelector('.live-badge')?.classList.toggle('degraded', degraded);
 }
 
+// Katman seçimleri hatırlanır; ilk ziyarette hepsi kapalı (temiz Dünya)
+const LAYERS_KEY = 'earthlive.layers';
+const LAYER_IDS = Object.keys(layers) as LayerId[];
+
+function applyLayerState(id: LayerId, on: boolean) {
+  const input = $<HTMLInputElement>(`toggle-${id}`);
+  input.checked = on;
+  layers[id].setVisible(on);
+  document.querySelector<HTMLElement>(`.layer-card[data-layer="${id}"]`)!.classList.toggle('off', !on);
+  setLegendVisible($('legend'), id, on);
+  if (on) ensureData(id);
+  if (!on && selection?.kind === 'layer' && selection.layer === id) clearSelection();
+}
+
+function saveLayerState() {
+  try {
+    localStorage.setItem(LAYERS_KEY, JSON.stringify(LAYER_IDS.filter((id) => $<HTMLInputElement>(`toggle-${id}`).checked)));
+  } catch {
+    // kaydedilemese de bu oturumda çalışır
+  }
+}
+
+/** Katmanı aç/kapat (kullanıcı ya da arama/paylaşım/uyarı gibi bir eylem sonucu) */
+function setLayerEnabled(id: LayerId, on: boolean) {
+  if ($<HTMLInputElement>(`toggle-${id}`).checked === on) return;
+  applyLayerState(id, on);
+  saveLayerState();
+  updateStartHint();
+  updateLayerStatus();
+}
+
 function bindLayerToggle(id: LayerId) {
   const input = $<HTMLInputElement>(`toggle-${id}`);
-  const card = document.querySelector<HTMLElement>(`.layer-card[data-layer="${id}"]`)!;
   input.addEventListener('change', () => {
-    layers[id].setVisible(input.checked);
-    card.classList.toggle('off', !input.checked);
-    setLegendVisible($('legend'), id, input.checked);
-    if (!input.checked && selection?.kind === 'layer' && selection.layer === id) clearSelection();
+    applyLayerState(id, input.checked);
+    saveLayerState();
+    updateStartHint();
+    updateLayerStatus();
   });
 }
-(Object.keys(layers) as LayerId[]).forEach(bindLayerToggle);
+
+/** Hiç katman açık değilse kullanıcıyı panele yönlendiren cümle */
+function updateStartHint() {
+  const anyOn = LAYER_IDS.some((id) => $<HTMLInputElement>(`toggle-${id}`).checked);
+  const narrow = matchMedia('(max-width: 860px)').matches;
+  $('start-hint-text').textContent = narrow ? t('hint.mobile') : t('hint.desktop');
+  $('start-hint').classList.toggle('narrow', narrow);
+  $('start-hint').hidden = anyOn || document.body.classList.contains('focus');
+}
+LAYER_IDS.forEach(bindLayerToggle);
+{
+  let saved: string[] = [];
+  try {
+    saved = JSON.parse(localStorage.getItem(LAYERS_KEY) ?? '[]');
+  } catch {
+    // ilk ziyaret gibi davran
+  }
+  for (const id of LAYER_IDS) applyLayerState(id, saved.includes(id));
+  // paylaşılan bağlantıdaki nesnenin katmanı kapalıysa verisi yine de yüklensin (seçilince açılır)
+  if (pendingShared?.kind === 'layer') ensureData(pendingShared.layer);
+  updateStartHint();
+  matchMedia('(max-width: 860px)').addEventListener('change', updateStartHint);
+}
 
 quakeFeedSel.addEventListener('change', () => {
   state.earthquakes.loading = true;
@@ -490,6 +628,35 @@ function setLayersVisible(open: boolean) {
 }
 layersBtn.addEventListener('click', () => setLayersVisible(!layersVisible()));
 narrowScreen.addEventListener('change', syncLayersButton);
+// ---------------------------------------------------------------- odak modu: yalnızca Dünya
+let focusIdleTimer: ReturnType<typeof setTimeout> | null = null;
+const inFocus = () => document.body.classList.contains('focus');
+
+/** Fare kıpırdayınca çıkış düğmesi görünür, 2,5 sn hareketsizlikte kaybolur */
+function revealFocusExit() {
+  const btn = $('focus-exit');
+  btn.classList.add('show');
+  if (focusIdleTimer) clearTimeout(focusIdleTimer);
+  focusIdleTimer = setTimeout(() => btn.classList.remove('show'), 2500);
+}
+
+function setFocus(on: boolean) {
+  document.body.classList.toggle('focus', on);
+  updateStartHint();
+  if (on) revealFocusExit();
+}
+
+$('focus-toggle').addEventListener('click', () => setFocus(true));
+$('focus-exit').addEventListener('click', () => setFocus(false));
+window.addEventListener('pointermove', () => {
+  if (inFocus()) revealFocusExit();
+});
+window.addEventListener('keydown', (e) => {
+  if (e.ctrlKey || e.metaKey || e.altKey || (e.target as HTMLElement).closest('input, select, textarea')) return;
+  if (e.key === 'f' || e.key === 'F') setFocus(!inFocus());
+  else if (e.key === 'Escape' && inFocus()) setFocus(false);
+});
+
 // dar ekranda Dünya'ya dokununca panel kapanır, gezegen görünür
 container.addEventListener('pointerdown', () => {
   if (narrowScreen.matches && layersVisible()) setLayersVisible(false);
@@ -639,6 +806,8 @@ const detailsContent = $('details-content');
 const reticle = $('reticle');
 
 function selectLayerItem(id: LayerId, index: number) {
+  // seçilen nesnenin katmanı kapalıysa aç (arama, paylaşılan bağlantı, uyarı)
+  setLayerEnabled(id, true);
   for (const l of Object.values(layers)) if (l.id !== id) l.select(null);
   layers[id].select(index);
   selection = { kind: 'layer', layer: id, key: layers[id].keyOf(index) };
@@ -870,6 +1039,9 @@ searchInput.addEventListener('input', () => {
     closeResults();
     return;
   }
+  // uçuş/uydu araması için veriyi (henüz yüklenmediyse) indirmeye başla
+  ensureData('aircraft');
+  ensureData('satellites');
   // uçak ve uydu eşleşmeleri eldeki veriden anında; yerler ağdan biraz sonra gelir
   activeResult = 0;
   showResults(objectMatches(q), true);
@@ -1074,7 +1246,8 @@ function slowTick(now: number) {
 
 // sekme görünmezken ağ isteklerini durdur
 document.addEventListener('visibilitychange', () => {
-  const pollers = [quakePoller, aircraftPoller, statusPoller, firePoller, eventPoller];
+  // yalnızca başlatılmış (açılmış katmanların) veri akışları yeniden başlar
+  const pollers = [quakePoller, statusPoller, eventPoller, alertPoller, ...[...startedPollers].map((id) => lazyPollers[id]!)];
   if (document.hidden) pollers.forEach((p) => p.stop());
   else pollers.forEach((p) => p.refresh());
 });
@@ -1114,4 +1287,4 @@ window.addEventListener('appinstalled', () => {
 });
 
 // geliştirme sırasında konsoldan inceleme için
-if (import.meta.env.DEV) Object.assign(window, { __earthlive: { globe, layers, pickAt, selectLayerItem } });
+if (import.meta.env.DEV) Object.assign(window, { __earthlive: { globe, layers, pickAt, selectLayerItem, showAlert } });

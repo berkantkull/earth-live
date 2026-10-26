@@ -81,6 +81,9 @@
           <button class="icon-btn" id="install-app" data-i18n-attr="aria-label:app.install;title:app.install" aria-label="Uygulamayı yükle" title="Uygulamayı yükle" hidden>
             <svg viewBox="0 0 24 24"><path d="M12 4v11M7.5 10.5 12 15l4.5-4.5" /><path d="M5 19h14" /></svg>
           </button>
+          <button class="icon-btn" id="focus-toggle" type="button" data-i18n-attr="aria-label:focus.enter;title:focus.enter" aria-label="Odak modu" title="Odak modu">
+            <svg viewBox="0 0 24 24"><path d="M4 9V4h5M20 9V4h-5M4 15v5h5M20 15v5h-5" /></svg>
+          </button>
           <button class="icon-btn lang-btn" id="lang-toggle" type="button" data-i18n-attr="aria-label:app.language;title:app.language" aria-label="Dil" title="Dil">EN</button>
           <button class="icon-btn" id="share-view" data-i18n-attr="aria-label:app.shareView;title:app.shareView" aria-label="Bu görünümü paylaş" title="Bu görünümü paylaş">
             <svg viewBox="0 0 24 24"><circle cx="18" cy="5" r="2.5" /><circle cx="6" cy="12" r="2.5" /><circle cx="18" cy="19" r="2.5" /><path d="m8.2 10.8 7.6-4.5M8.2 13.2l7.6 4.5" /></svg>
@@ -109,7 +112,7 @@
               <small data-i18n="layer.earthquakes.sub">USGS · sismik ağ</small>
             </div>
             <span class="layer-count" id="count-earthquakes">—</span>
-            <label class="switch"><input type="checkbox" id="toggle-earthquakes" checked /><span></span><em class="sr" data-i18n="layer.earthquakes">Depremler</em></label>
+            <label class="switch"><input type="checkbox" id="toggle-earthquakes" /><span></span><em class="sr" data-i18n="layer.earthquakes">Depremler</em></label>
           </header>
           <div class="layer-body">
             <label class="field">
@@ -136,7 +139,7 @@
               <small data-i18n="layer.aircraft.sub">OpenSky · ADS-B</small>
             </div>
             <span class="layer-count" id="count-aircraft">—</span>
-            <label class="switch"><input type="checkbox" id="toggle-aircraft" checked /><span></span><em class="sr" data-i18n="layer.aircraft">Uçaklar</em></label>
+            <label class="switch"><input type="checkbox" id="toggle-aircraft" /><span></span><em class="sr" data-i18n="layer.aircraft">Uçaklar</em></label>
           </header>
           <div class="layer-body">
             <label class="check">
@@ -155,7 +158,7 @@
               <small data-i18n="layer.satellites.sub">CelesTrak · SGP4</small>
             </div>
             <span class="layer-count" id="count-satellites">—</span>
-            <label class="switch"><input type="checkbox" id="toggle-satellites" checked /><span></span><em class="sr" data-i18n="layer.satellites">Uydular</em></label>
+            <label class="switch"><input type="checkbox" id="toggle-satellites" /><span></span><em class="sr" data-i18n="layer.satellites">Uydular</em></label>
           </header>
           <div class="layer-body">
             <label class="field">
@@ -174,7 +177,7 @@
               <small data-i18n="layer.plates.sub">PB2002 · Bird (2003)</small>
             </div>
             <span class="layer-count" id="count-plates">—</span>
-            <label class="switch"><input type="checkbox" id="toggle-plates" checked /><span></span><em class="sr" data-i18n="layer.plates">Tektonik plakalar</em></label>
+            <label class="switch"><input type="checkbox" id="toggle-plates" /><span></span><em class="sr" data-i18n="layer.plates">Tektonik plakalar</em></label>
           </header>
           <footer class="layer-status" id="status-plates" data-i18n="status.waiting">Bekleniyor…</footer>
         </section>
@@ -187,7 +190,7 @@
               <small data-i18n="layer.fires.sub">NASA FIRMS · MODIS 24 sa</small>
             </div>
             <span class="layer-count" id="count-fires">—</span>
-            <label class="switch"><input type="checkbox" id="toggle-fires" checked /><span></span><em class="sr" data-i18n="layer.fires">Aktif yangınlar</em></label>
+            <label class="switch"><input type="checkbox" id="toggle-fires" /><span></span><em class="sr" data-i18n="layer.fires">Aktif yangınlar</em></label>
           </header>
           <footer class="layer-status" id="status-fires" data-i18n="status.waiting">Bekleniyor…</footer>
         </section>
@@ -200,7 +203,7 @@
               <small data-i18n="layer.events.sub">NASA EONET · volkan, fırtına, buz</small>
             </div>
             <span class="layer-count" id="count-events">—</span>
-            <label class="switch"><input type="checkbox" id="toggle-events" checked /><span></span><em class="sr" data-i18n="layer.events">Doğal olaylar</em></label>
+            <label class="switch"><input type="checkbox" id="toggle-events" /><span></span><em class="sr" data-i18n="layer.events">Doğal olaylar</em></label>
           </header>
           <footer class="layer-status" id="status-events" data-i18n="status.waiting">Bekleniyor…</footer>
         </section>
@@ -241,6 +244,24 @@
         </button>
         <div class="legend-body" id="legend" data-i18n-attr="aria-label:legend.label" aria-label="Lejant" hidden></div>
       </section>
+
+      <p class="start-hint" id="start-hint" hidden>
+        <span class="start-hint-arrow" aria-hidden="true">←</span>
+        <span id="start-hint-text"></span>
+      </p>
+
+      <div class="quake-alert" id="quake-alert" role="alert" hidden>
+        <span class="qa-badge" id="qa-badge"></span>
+        <span class="qa-text" id="qa-text"></span>
+        <button class="btn qa-show" id="qa-show" type="button" data-i18n="alert.show">Göster</button>
+        <button class="close-btn qa-close" id="qa-close" type="button" data-i18n-attr="aria-label:alert.dismiss" aria-label="Kapat">
+          <svg viewBox="0 0 24 24"><path d="M6 6l12 12M18 6 6 18" /></svg>
+        </button>
+      </div>
+
+      <button class="icon-btn focus-exit" id="focus-exit" type="button" data-i18n-attr="aria-label:focus.exit;title:focus.exit" aria-label="Odak modundan çık" title="Odak modundan çık">
+        <svg viewBox="0 0 24 24"><path d="M9 4v5H4M15 4v5h5M9 20v-5H4M15 20v-5h5" /></svg>
+      </button>
 
       <section class="panel timeline" id="timeline" data-i18n-attr="aria-label:tl.label" aria-label="Deprem zaman çizelgesi" hidden>
         <button class="tl-play" id="tl-play" type="button" data-i18n-attr="aria-label:tl.play" aria-label="Oynat">

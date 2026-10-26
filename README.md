@@ -15,6 +15,9 @@ Gerçek Dünya gözlem verilerini fotogerçekçi bir 3B gezegen üzerinde göste
 - **Tektonik plakalar** — Bird (2003) PB2002 modelindeki 241 plaka sınırı; dalma-batma zonları ayrı renkte. Bir sınır seçilince uzunluğu ve seçili zaman aralığında sınıra 100 km içindeki depremler gösterilir.
 - **Arama** — Şehir/yer (Open-Meteo Geocoding, GeoNames), uçuş (çağrı işareti, ör. `THY`) veya uydu (ad ya da NORAD numarası, ör. `ISS`, `25544`). Kamera seçilen yere ya da nesneye uçar.
 - **Uydu geçiş tahmini** — Seçilen uydunun aranan şehir ya da cihaz konumu üzerinden önümüzdeki geçişleri: saat, en yüksek açı, doğuş/batış yönü ve çıplak gözle görünürlük (gökyüzü karanlık ve uydu Güneş ışığı alıyorsa).
+- **Temiz açılış** — İlk ziyarette yalnızca Dünya görünür; kısa bir yönlendirme katman seçmeye davet eder. Seçimler hatırlanır; büyük veri setleri (uçak, uydu, yangın) katman açılana ya da aranana kadar indirilmez.
+- **Önemli deprem uyarısı** — Son bir saatte M6+ ya da tsunami uyarılı bir deprem olursa üstte tek satırlık bildirim çıkar; "Göster" kamerayı depreme götürür. Her deprem için bir kez gösterilir.
+- **Odak modu** — `F` tuşu ya da sağ üstteki düğmeyle tüm paneller gizlenir, yalnızca Dünya kalır; `F` / `Esc` ile çıkılır.
 - **Türkçe / English** — Arayüz tarayıcı diline göre açılır; sağ üstteki TR/EN düğmesiyle değiştirilir ve tercih hatırlanır. Tarih, sayı ve yer araması sonuçları da seçili dilde gelir.
 - **Uygulama olarak kurulum (PWA)** — Telefona ve bilgisayara uygulama gibi yüklenebilir; service worker sayesinde ikinci açılış önbellekten anında gelir, internet yokken son kaydedilen verilerle açılır.
 - **Paylaşılabilir bağlantılar** — Kamera, seçili nesne ve filtreler adres çubuğunda tutulur (`#c=…&s=…`); bağlantıyı açan kişi aynı görünümü görür. Bağlantı paylaşıldığında önizleme kartı çıkar.
