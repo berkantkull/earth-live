@@ -381,6 +381,37 @@ input[type='range'] { width: 100%; accent-color: var(--accent); }
   z-index: 4; pointer-events: none;
 }
 
+/* ---------- deprem zaman çizelgesi ---------- */
+.replay-btn { justify-content: center; width: 100%; }
+.replay-btn svg { width: 14px; height: 14px; fill: currentColor; }
+
+.timeline {
+  left: 50%; transform: translateX(-50%);
+  bottom: calc(var(--gutter) + 58px);
+  width: min(620px, calc(100% - 2 * 292px - 4 * var(--gutter)));
+  min-width: 340px;
+  display: flex; align-items: center; gap: 12px;
+  padding: 10px 12px;
+  z-index: 6;
+}
+.tl-play {
+  width: 40px; height: 40px; flex: none; border-radius: 50%;
+  display: grid; place-items: center; cursor: pointer;
+  border: 1px solid rgba(90, 209, 255, 0.5); background: rgba(90, 209, 255, 0.12); color: var(--accent);
+}
+.tl-play:hover { background: rgba(90, 209, 255, 0.22); }
+.tl-play:focus-visible { outline: none; box-shadow: 0 0 0 3px var(--accent-soft); }
+.tl-play svg { width: 18px; height: 18px; fill: currentColor; }
+.tl-play .i-pause, .timeline.playing .tl-play .i-play { display: none; }
+.timeline.playing .tl-play .i-pause { display: block; }
+.tl-main { flex: 1; min-width: 0; display: grid; gap: 4px; }
+.tl-top { display: flex; justify-content: space-between; gap: 10px; font: 600 12.5px/1.2 var(--mono); font-variant-numeric: tabular-nums; }
+.tl-top .muted { font-weight: 500; font-size: 11.5px; }
+.tl-scale { display: flex; justify-content: space-between; font: 10px/1 var(--mono); color: var(--muted); }
+#tl-range { margin: 2px 0; }
+.tl-speed select { height: 30px; width: auto; padding: 0 8px; font-size: 12px; }
+.timeline .tl-close { position: static; flex: none; }
+
 #tooltip {
   position: absolute; pointer-events: none; z-index: 20;
   padding: 6px 9px; border-radius: 7px;
@@ -450,5 +481,7 @@ input[type='range'] { width: 100%; accent-color: var(--accent); }
   .copyright { font-size: 10px; }
   .sources-panel.open { width: auto; }
   .hud { display: none; }
+  .timeline { bottom: 82px; width: calc(100% - 2 * var(--gutter)); min-width: 0; gap: 8px; z-index: 9; }
+  .tl-speed { display: none; }
   #toasts { top: 124px; }
 }

@@ -7,18 +7,33 @@ import type { Layer } from './Layer.ts';
 const SURFACE = 1.0085;
 const PULSE_WINDOW_MS = 3 * 3600_000;
 
+/*
+ * Zaman imleci: aTime (deprem zamanı) ve uCursor (gösterilen an) aynı tabana göre saniye.
+ * İmleçten sonraki depremler çizilmez; imlece yakın olanlar nabız atar.
+ * Canlı modda imleç "şimdi"dir, zaman kaydırıcısında kullanıcının seçtiği an.
+ */
 const vertex = /* glsl */ `
   attribute vec3 aColor;
-  attribute float aPulse;
+  attribute float aTime;
   attribute float aSelected;
+  uniform float uCursor;
+  uniform float uPulseWindow;
   varying vec2 vUv;
   varying vec3 vColor;
   varying float vPulse;
+  varying float vPhase;
   varying float vSelected;
   void main() {
+    float age = uCursor - aTime;
+    if (age < 0.0) {
+      // henüz olmamış deprem: kırpma alanının dışına at
+      gl_Position = vec4(2.0, 2.0, 2.0, 1.0);
+      return;
+    }
     vUv = uv;
     vColor = aColor;
-    vPulse = aPulse;
+    vPulse = clamp(1.0 - age / uPulseWindow, 0.0, 1.0);
+    vPhase = fract(aTime * 0.000731);
     vSelected = aSelected;
     gl_Position = projectionMatrix * viewMatrix * modelMatrix * instanceMatrix * vec4(position, 1.0);
   }
@@ -29,6 +44,7 @@ const fragment = /* glsl */ `
   varying vec2 vUv;
   varying vec3 vColor;
   varying float vPulse;
+  varying float vPhase;
   varying float vSelected;
   void main() {
     float r = length(vUv - 0.5) * 2.0;
@@ -38,7 +54,7 @@ const fragment = /* glsl */ `
     float a = core * 0.62 + rim * 0.95;
     vec3 col = mix(vColor, vec3(1.0), rim * 0.35);
     if (vPulse > 0.0) {
-      float p = fract(time * 0.45 + vPulse * 7.0);
+      float p = fract(time * 0.45 + vPhase);
       float pr = 0.4 + p * 0.6;
       float ring = (1.0 - smoothstep(0.0, 0.05, abs(r - pr))) * (1.0 - p) * vPulse;
       a = max(a, ring * 0.9);
@@ -69,12 +85,17 @@ export class EarthquakeLayer implements Layer {
   private selected: number | null = null;
   private filter: QuakeFilter = { minMagnitude: 0 };
   private lastScale = -1;
+  /** zaman değerlerinin tabanı (ms); float32 hassasiyeti için göreli saniye kullanılır */
+  private baseMs = 0;
+  /** zaman kaydırıcısının gösterdiği an; null = canlı (şimdi) */
+  private cursorMs: number | null = null;
+  private replayPulseSec = PULSE_WINDOW_MS / 1000;
 
   constructor() {
     this.material = new THREE.ShaderMaterial({
       vertexShader: vertex,
       fragmentShader: fragment,
-      uniforms: { time: { value: 0 } },
+      uniforms: { time: { value: 0 }, uCursor: { value: 0 }, uPulseWindow: { value: PULSE_WINDOW_MS / 1000 } },
       transparent: true,
       depthWrite: false,
       side: THREE.DoubleSide,
@@ -108,6 +129,39 @@ export class EarthquakeLayer implements Layer {
     this.rebuild();
   }
 
+  /** Verideki en eski ve en yeni deprem zamanı (ms) */
+  get timeRange(): { start: number; end: number } | null {
+    if (!this.all.length) return null;
+    let start = Infinity;
+    let end = -Infinity;
+    for (const q of this.all) {
+      if (q.time < start) start = q.time;
+      if (q.time > end) end = q.time;
+    }
+    return { start, end };
+  }
+
+  /**
+   * Zaman kaydırıcısı: yalnızca `ms` anına kadar olan depremler görünür.
+   * pulseSec, imlece bu kadar yakın depremlerin nabız atacağı süre. null → canlı mod.
+   */
+  setTimeCursor(ms: number | null, pulseSec = PULSE_WINDOW_MS / 1000) {
+    this.cursorMs = ms;
+    this.replayPulseSec = pulseSec;
+  }
+
+  get timeCursor() {
+    return this.cursorMs;
+  }
+
+  /** İmleçte görünen (filtrelerden geçmiş) deprem sayısı */
+  get countAtCursor(): number {
+    if (this.cursorMs === null) return this.items.length;
+    let n = 0;
+    for (const q of this.items) if (q.time <= this.cursorMs) n++;
+    return n;
+  }
+
   private rebuild() {
     const selKey = this.selected !== null ? this.keyOf(this.selected) : null;
     // büyükler sonda çizilsin (üstte görünsün)
@@ -123,18 +177,17 @@ export class EarthquakeLayer implements Layer {
     const n = this.items.length;
     const geo = this.geometry.clone();
     const colors = new Float32Array(n * 3);
-    const pulse = new Float32Array(n);
+    const times = new Float32Array(n);
     const selected = new Float32Array(n);
-    const now = Date.now();
+    this.baseMs = this.timeRange?.start ?? Date.now();
     const c = new THREE.Color();
     this.items.forEach((q, i) => {
       c.set(stopColor(DEPTH_STOPS, q.depthKm));
       colors.set([c.r, c.g, c.b], i * 3);
-      const age = now - q.time;
-      pulse[i] = age < PULSE_WINDOW_MS ? 1 - age / PULSE_WINDOW_MS : 0;
+      times[i] = (q.time - this.baseMs) / 1000;
     });
     geo.setAttribute('aColor', new THREE.InstancedBufferAttribute(colors, 3));
-    geo.setAttribute('aPulse', new THREE.InstancedBufferAttribute(pulse, 1));
+    geo.setAttribute('aTime', new THREE.InstancedBufferAttribute(times, 1));
     geo.setAttribute('aSelected', new THREE.InstancedBufferAttribute(selected, 1));
     this.mesh = new THREE.InstancedMesh(geo, this.material, Math.max(1, n));
     this.mesh.count = n;
@@ -148,7 +201,10 @@ export class EarthquakeLayer implements Layer {
   }
 
   update(zoomScale: number, time: number) {
-    this.material.uniforms.time.value = time / 1000;
+    const u = this.material.uniforms;
+    u.time.value = time / 1000;
+    u.uCursor.value = ((this.cursorMs ?? time) - this.baseMs) / 1000;
+    u.uPulseWindow.value = this.cursorMs === null ? PULSE_WINDOW_MS / 1000 : this.replayPulseSec;
     const scale = Math.min(1.6, Math.max(0.25, zoomScale));
     if (!this.mesh || Math.abs(scale - this.lastScale) < 0.01) return;
     this.lastScale = scale;
@@ -174,6 +230,8 @@ export class EarthquakeLayer implements Layer {
     const p = new THREE.Vector3();
     // büyükten küçüğe — üst üste binenlerde büyük olan öne geçsin
     for (let i = this.items.length - 1; i >= 0; i--) {
+      // zaman kaydırıcısında henüz olmamış depremler seçilemez
+      if (this.cursorMs !== null && this.items[i].time > this.cursorMs) continue;
       latLonToVec3(this.items[i].lat, this.items[i].lon, SURFACE, p);
       cb(i, p);
     }

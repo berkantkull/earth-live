@@ -9,6 +9,7 @@ Gerçek Dünya gözlem verilerini fotogerçekçi bir 3B gezegen üzerinde göste
 - **Depremler** — USGS Earthquake Hazards Program GeoJSON akışları (son 1 saat → son 30 gün). Renk derinliği, boyut büyüklüğü gösterir; son 3 saatteki olaylar nabız halkasıyla işaretlenir. Detayda PAGER/tsunami bilgisi ve açığa çıkan enerji yer alır.
 - **Uçaklar** — OpenSky Network ADS-B durum vektörleri (~12 bin uçak). Konumlar, ölçüm anından itibaren hız ve rota ile ileri tahmin edilir (dead reckoning); veri yenilemeleri arasında uçaklar akıcı hareket eder.
 - **Uydular** — CelesTrak GP/TLE verisi; yörüngeler tarayıcıda, ayrı bir Web Worker içinde SGP4 ile hesaplanır. Seçilen uydu için bir periyotluk yörünge izi, canlı irtifa/hız/alt-uydu noktası ve yörünge elemanları gösterilir. CelesTrak bir grubu veremezse "tüm aktif uydular" için SatNOGS DB yedek kaynak olarak kullanılır.
+- **Zaman çizelgesi** — Seçili deprem akışını (son 1 saat → son 30 gün) animasyonla oynatma; kaydırıcıyla herhangi bir ana gitme, hız seçimi, boşluk tuşuyla oynat/duraklat.
 - **Aktif yangınlar** — NASA FIRMS, MODIS uydularının son 24 saatteki ~20 bin yangın tespiti; renk ve boyut ateş ışınım gücüne (FRP, MW) göre.
 - **Doğal olaylar** — NASA EONET'teki açık volkan, şiddetli fırtına, buzdağı ve diğer olaylar; fırtınaların izi haritada çizilir.
 - **Tektonik plakalar** — Bird (2003) PB2002 modelindeki 241 plaka sınırı; dalma-batma zonları ayrı renkte. Bir sınır seçilince uzunluğu ve seçili zaman aralığında sınıra 100 km içindeki depremler gösterilir.

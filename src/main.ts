@@ -14,6 +14,7 @@ import { num, relativeTime } from './lib/format.ts';
 import { predictPasses, type Observer, type Pass } from './lib/passes.ts';
 import { boundaryLengthKm, distanceToBoundaryKm, type PlateData } from './lib/plates.ts';
 import { matchAircraft, matchSatellites } from './lib/search.ts';
+import { Timeline } from './lib/timeline.ts';
 import {
   QUAKE_FEEDS,
   SATELLITE_GROUPS,
@@ -140,6 +141,9 @@ if (initialView.camera) {
 }
 /** bağlantıdaki seçim, ilgili veri gelince uygulanır */
 let pendingShared: SharedSelection | null = initialView.selection ?? null;
+// Uygulama açıkken başka bir paylaşım bağlantısı yapıştırılırsa (yalnızca # değişir) o görünümle yeniden aç.
+// replaceState ile yaptığımız güncellemeler bu olayı tetiklemez.
+window.addEventListener('hashchange', () => location.reload());
 /** seçilen nesnenin konumu hesaplanınca kamerayı oraya götür */
 let pendingFly = false;
 
@@ -185,6 +189,10 @@ const quakePoller = new Poller(
   (r) => {
     quakes.setData(r.data);
     received('earthquakes', r.meta);
+    if (timelineOpen) {
+      syncTimelineRange();
+      renderTimeline();
+    }
   },
   (e) => failed('earthquakes', e),
 );
@@ -374,6 +382,88 @@ quakeMin.addEventListener('input', () => {
 if (initialView.minMagnitude) {
   quakeMin.value = String(initialView.minMagnitude);
   quakeMin.dispatchEvent(new Event('input'));
+}
+
+// ---------------------------------------------------------------- deprem zaman çizelgesi
+const timeline = new Timeline();
+const timelineEl = $('timeline');
+const tlRange = $<HTMLInputElement>('tl-range');
+const tlDateFmt = new Intl.DateTimeFormat('tr-TR', { day: 'numeric', month: 'short', hour: '2-digit', minute: '2-digit' });
+let timelineOpen = false;
+let tlLabelAt = 0;
+
+function syncTimelineRange() {
+  const r = quakes.timeRange;
+  if (!r) return;
+  // aralığın sonu "şimdi": son depremden sonraki sessiz dönem de görünsün
+  timeline.setRange(r.start, Math.max(r.end, Date.now()));
+  $('tl-start').textContent = tlDateFmt.format(timeline.start);
+  $('tl-end').textContent = tlDateFmt.format(timeline.end);
+}
+
+function renderTimeline() {
+  quakes.setTimeCursor(timeline.cursor, Math.max(600, timeline.span / 1000 / 12));
+  tlRange.value = String(Math.round(timeline.fraction * 1000));
+  timelineEl.classList.toggle('playing', timeline.playing);
+  $('tl-play').setAttribute('aria-label', timeline.playing ? 'Duraklat' : 'Oynat');
+  $('tl-time').textContent = tlDateFmt.format(timeline.cursor);
+  $('tl-count').textContent = `${num(quakes.countAtCursor)} deprem`;
+}
+
+function openTimeline() {
+  if (!quakes.timeRange) {
+    toast($('toasts'), 'Deprem verisi henüz yüklenmedi.', 'info');
+    return;
+  }
+  timelineOpen = true;
+  timelineEl.hidden = false;
+  syncTimelineRange();
+  timeline.seek(0);
+  timeline.play();
+  globe.pauseAutoRotate(60_000);
+  renderTimeline();
+}
+
+function closeTimeline() {
+  timelineOpen = false;
+  timeline.pause();
+  timelineEl.hidden = true;
+  quakes.setTimeCursor(null);
+  updateLayerStatus();
+}
+
+$('quake-replay').addEventListener('click', openTimeline);
+$('tl-close').addEventListener('click', closeTimeline);
+$('tl-play').addEventListener('click', () => {
+  timeline.toggle();
+  renderTimeline();
+});
+tlRange.addEventListener('input', () => {
+  timeline.pause();
+  timeline.seek(Number(tlRange.value) / 1000);
+  renderTimeline();
+});
+$<HTMLSelectElement>('tl-speed').addEventListener('change', (e) => {
+  timeline.sweepSeconds = Number((e.target as HTMLSelectElement).value);
+});
+window.addEventListener('keydown', (e) => {
+  // boşluk tuşu: zaman çizelgesi açıkken oynat/duraklat (yazı alanında değilken)
+  if (!timelineOpen || e.key !== ' ' || (e.target as HTMLElement).closest('input, select, textarea, button')) return;
+  e.preventDefault();
+  timeline.toggle();
+  renderTimeline();
+});
+
+/** her karede: oynatılıyorsa imleci ilerlet */
+function stepTimeline(dt: number, now: number) {
+  if (!timelineOpen || !timeline.playing) return;
+  timeline.step(dt);
+  quakes.setTimeCursor(timeline.cursor, Math.max(600, timeline.span / 1000 / 12));
+  // metin ve kaydırıcıyı saniyede ~12 kez güncelle
+  if (now - tlLabelAt > 80 || !timeline.playing) {
+    tlLabelAt = now;
+    renderTimeline();
+  }
 }
 $<HTMLInputElement>('aircraft-ground').addEventListener('change', (e) => {
   aircraft.setFilter({ showOnGround: (e.target as HTMLInputElement).checked });
@@ -911,13 +1001,14 @@ if (pendingShared?.kind === 'place') {
 
 // ---------------------------------------------------------------- kare döngüsü
 let lastSlowTick = 0;
-globe.onFrame((_dt, now) => {
+globe.onFrame((dt, now) => {
   const zs = globe.zoomScale;
   quakes.update(zs, now);
   aircraft.update(zs, now);
   satellites.update(zs, now);
   fires.update(zs);
   events.update(zs, now);
+  stepTimeline(dt, now);
 
   // seçili nesneyi işaretleyen nişangah + takip modu
   if (selection?.kind === 'layer') {
