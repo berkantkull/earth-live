@@ -5,6 +5,8 @@ import { Globe } from './globe/Globe.ts';
 import { AircraftLayer } from './layers/AircraftLayer.ts';
 import { EarthquakeLayer } from './layers/EarthquakeLayer.ts';
 import type { Layer, LayerId } from './layers/Layer.ts';
+import { EventLayer } from './layers/EventLayer.ts';
+import { FireLayer } from './layers/FireLayer.ts';
 import { PlateLayer } from './layers/PlateLayer.ts';
 import { SatelliteLayer } from './layers/SatelliteLayer.ts';
 import { EARTH_RADIUS_KM, formatLat, formatLon, isOccludedByEarth, latLonToVec3, vec3ToLatLon } from './lib/geo.ts';
@@ -24,6 +26,8 @@ import {
   renderEarthquake,
   renderPasses,
   renderPlace,
+  renderEvent,
+  renderFire,
   renderPlateBoundary,
   renderSatellite,
   updateSatelliteLive,
@@ -79,7 +83,9 @@ const quakes = new EarthquakeLayer();
 const aircraft = new AircraftLayer();
 const satellites = new SatelliteLayer();
 const plates = new PlateLayer();
-const layers: Record<LayerId, Layer> = { earthquakes: quakes, aircraft, satellites, plates };
+const fires = new FireLayer();
+const events = new EventLayer();
+const layers: Record<LayerId, Layer> = { earthquakes: quakes, aircraft, satellites, plates, fires, events };
 for (const l of Object.values(layers)) globe.world.add(l.group);
 
 /** Bildirim ve ipuçlarında kullanılan katman adları */
@@ -88,6 +94,8 @@ const LAYER_NAMES: Record<LayerId, { noun: string; tag: string }> = {
   aircraft: { noun: 'Uçak', tag: 'UÇAK' },
   satellites: { noun: 'Uydu', tag: 'UYDU' },
   plates: { noun: 'Plaka sınırı', tag: 'PLAKA' },
+  fires: { noun: 'Yangın', tag: 'YANGIN' },
+  events: { noun: 'Doğal olay', tag: 'OLAY' },
 };
 
 // ---------------------------------------------------------------- durum
@@ -102,6 +110,8 @@ const state: Record<LayerId, LayerState> = {
   aircraft: { meta: null, loading: true, error: null, receivedAt: null },
   satellites: { meta: null, loading: true, error: null, receivedAt: null },
   plates: { meta: null, loading: true, error: null, receivedAt: null },
+  fires: { meta: null, loading: true, error: null, receivedAt: null },
+  events: { meta: null, loading: true, error: null, receivedAt: null },
 };
 let aircraftObservedAt = Date.now();
 
@@ -159,6 +169,8 @@ function resolvePendingShared(id: LayerId) {
       aircraft: 'uçak şu an yayında (inmiş olabilir)',
       satellites: 'uydu bu grupta',
       plates: 'plaka sınırı',
+      fires: 'yangın tespiti son 24 saatte',
+      events: 'doğal olay artık açık değil (sona ermiş olabilir)',
     }[id];
     toast($('toasts'), `Paylaşılan ${what} bulunamadı.`, 'info');
     return;
@@ -281,6 +293,28 @@ async function loadPlates() {
   }
 }
 void loadPlates();
+
+// NASA: aktif yangınlar (FIRMS ~3 saatte bir günceller) ve doğal olaylar (EONET)
+const firePoller = new Poller(
+  () => api.fires(),
+  10 * 60_000,
+  (r) => {
+    if (r.meta.fetchedAt !== state.fires.meta?.fetchedAt || fires.data.length === 0) fires.setData(r.data);
+    received('fires', r.meta);
+  },
+  (e) => failed('fires', e),
+);
+const eventPoller = new Poller(
+  () => api.events(),
+  30 * 60_000,
+  (r) => {
+    events.setData(r.data);
+    received('events', r.meta);
+  },
+  (e) => failed('events', e),
+);
+firePoller.start();
+eventPoller.start();
 
 // ---------------------------------------------------------------- katman kontrolleri
 function updateLayerStatus() {
@@ -427,9 +461,9 @@ function pickAt(clientX: number, clientY: number): Hit | null {
   let best: Hit | null = null;
   // uydular ve uçaklar küçük; depremlere göre hafif öncelik ver.
   // Plaka çizgileri en altta: yalnızca üstünde başka nesne yoksa seçilir.
-  const bias: Record<LayerId, number> = { satellites: 0, aircraft: 0, earthquakes: 3, plates: 6 };
+  const bias: Record<LayerId, number> = { events: 0, satellites: 0, aircraft: 0, earthquakes: 3, fires: 4, plates: 6 };
 
-  for (const id of ['satellites', 'aircraft', 'earthquakes', 'plates'] as LayerId[]) {
+  for (const id of ['events', 'satellites', 'aircraft', 'earthquakes', 'fires', 'plates'] as LayerId[]) {
     layers[id].forEachPickable((index, p) => {
       const cw = vp[3] * p.x + vp[7] * p.y + vp[11] * p.z + vp[15];
       if (cw <= 0) return;
@@ -550,6 +584,10 @@ function refreshSelection() {
     detailsContent.innerHTML = renderAircraft(a, aircraft.estimate(a, Date.now()), aircraftObservedAt);
   } else if (id === 'plates') {
     detailsContent.innerHTML = renderPlateBoundary(plateInfo(idx));
+  } else if (id === 'fires') {
+    detailsContent.innerHTML = renderFire(fires.item(idx)!);
+  } else if (id === 'events') {
+    detailsContent.innerHTML = renderEvent(events.item(idx)!);
   } else {
     detailsContent.innerHTML = renderSatellite(satellites.item(idx)!, satellites.satrec(idx));
     renderPassSection();
@@ -878,6 +916,8 @@ globe.onFrame((_dt, now) => {
   quakes.update(zs, now);
   aircraft.update(zs, now);
   satellites.update(zs, now);
+  fires.update(zs);
+  events.update(zs, now);
 
   // seçili nesneyi işaretleyen nişangah + takip modu
   if (selection?.kind === 'layer') {
@@ -935,7 +975,7 @@ function slowTick(now: number) {
 
 // sekme görünmezken ağ isteklerini durdur
 document.addEventListener('visibilitychange', () => {
-  const pollers = [quakePoller, aircraftPoller, statusPoller];
+  const pollers = [quakePoller, aircraftPoller, statusPoller, firePoller, eventPoller];
   if (document.hidden) pollers.forEach((p) => p.stop());
   else pollers.forEach((p) => p.refresh());
 });

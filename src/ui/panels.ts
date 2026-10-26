@@ -1,5 +1,5 @@
 import { escapeHtml, num, relativeTime, utcString } from '../lib/format.ts';
-import { ALTITUDE_STOPS, DEPTH_STOPS, ORBIT_COLORS, PLATE_COLORS } from '../lib/scales.ts';
+import { ALTITUDE_STOPS, DEPTH_STOPS, EVENT_COLORS, FRP_STOPS, ORBIT_COLORS, PLATE_COLORS } from '../lib/scales.ts';
 import type { GeocodeResult, SourceMetaDto } from '../lib/types.ts';
 import { formatLat, formatLon } from '../lib/geo.ts';
 import type { ObjectMatch } from '../lib/search.ts';
@@ -64,6 +64,13 @@ export function renderLegend(el: HTMLElement) {
     group('plates', 'Plaka sınırı', [
       { color: PLATE_COLORS.subduction, label: 'Dalma-batma' },
       { color: PLATE_COLORS.boundary, label: 'Diğer sınırlar' },
+    ]),
+    group('fires', 'Yangın gücü', FRP_STOPS),
+    group('events', 'Doğal olay', [
+      { color: EVENT_COLORS.volcanoes, label: 'Volkan' },
+      { color: EVENT_COLORS.severeStorms, label: 'Fırtına' },
+      { color: EVENT_COLORS.seaLakeIce, label: 'Buz / buzdağı' },
+      { color: EVENT_COLORS.default, label: 'Diğer' },
     ]),
   ].join('');
 }

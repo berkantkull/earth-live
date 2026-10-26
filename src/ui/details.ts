@@ -3,8 +3,16 @@ import { formatLat, formatLon } from '../lib/geo.ts';
 import { compass, escapeHtml, localString, num, relativeTime, utcString } from '../lib/format.ts';
 import { orbitalElements, satelliteState } from '../lib/orbits.ts';
 import type { Observer, Pass } from '../lib/passes.ts';
-import { ALTITUDE_STOPS, DEPTH_STOPS, ORBIT_COLORS, PLATE_COLORS, stopColor } from '../lib/scales.ts';
-import type { Aircraft, Earthquake, GeocodeResult, SatelliteTle } from '../lib/types.ts';
+import { ALTITUDE_STOPS, DEPTH_STOPS, eventColor, FRP_STOPS, ORBIT_COLORS, PLATE_COLORS, stopColor } from '../lib/scales.ts';
+import {
+  EVENT_CATEGORIES,
+  type Aircraft,
+  type Earthquake,
+  type Fire,
+  type GeocodeResult,
+  type NaturalEvent,
+  type SatelliteTle,
+} from '../lib/types.ts';
 
 const cell = (label: string, value: string, wide = false) =>
   `<div${wide ? ' class="wide"' : ''}><dt>${label}</dt><dd>${value}</dd></div>`;
@@ -162,6 +170,74 @@ export function updateSatelliteLive(root: HTMLElement, rec: SatRec) {
   set('sat-lat', formatLat(st.lat));
   set('sat-lon', formatLon(st.lon));
   set('sat-speed', `${num(st.speedKms, 2)} km/s`);
+}
+
+// ---------------------------------------------------------------- NASA: yangın ve doğal olay
+
+function frpClass(frp: number): string {
+  if (frp < 10) return 'Düşük yoğunluk';
+  if (frp < 50) return 'Orta yoğunluk';
+  if (frp < 200) return 'Yüksek yoğunluk';
+  return 'Çok yüksek yoğunluk';
+}
+
+export function renderFire(f: Fire): string {
+  const color = stopColor(FRP_STOPS, f.frp);
+  const conf = f.confidence >= 80 ? 'Yüksek' : f.confidence >= 30 ? 'Nominal' : 'Düşük';
+  return `
+    <div class="d-kind" style="color:${color}"><i style="background:${color}"></i>Aktif yangın · uydu tespiti</div>
+    <h2 class="d-title">${formatLat(f.lat, 3)}, ${formatLon(f.lon, 3)}</h2>
+    <div class="d-sub">${relativeTime(f.time)} · ${localString(f.time)}</div>
+    <div class="d-hero"><span class="big">${num(f.frp, 1)}</span><span class="unit">MW ışınım gücü (FRP)</span></div>
+    <div class="d-tags">
+      <span class="tag">${frpClass(f.frp)}</span>
+      <span class="tag">${f.day ? 'GÜNDÜZ GEÇİŞİ' : 'GECE GEÇİŞİ'}</span>
+      <span class="tag ${f.confidence >= 80 ? 'ok' : f.confidence < 30 ? 'warn' : ''}">GÜVEN %${f.confidence}</span>
+    </div>
+    <dl class="d-grid">
+      ${cell('Parlaklık sıcaklığı', `${num(f.brightness)} K · ${num(f.brightness - 273.15)} °C`, true)}
+      ${cell('Tespit güveni', `${conf} (%${f.confidence})`)}
+      ${cell('Uydu', `${f.satellite} · MODIS`)}
+      ${cell('Tespit zamanı (UTC)', utcString(f.time), true)}
+    </dl>
+    <p class="d-note muted">FRP, yangının yaydığı ısı enerjisinin anlık ölçüsüdür; yanan biyokütle miktarıyla doğrudan ilişkilidir. Bir piksel yaklaşık 1 km² alanı temsil eder; tek bir yangın birden fazla tespit üretebilir. Sanayi tesisleri ve volkanlar da tespit edilebilir.</p>
+    <div class="d-actions">
+      <a class="btn primary" href="https://firms.modaps.eosdis.nasa.gov/map/#d:24hrs;@${f.lon.toFixed(3)},${f.lat.toFixed(3)},10.0z" target="_blank" rel="noopener">NASA FIRMS haritası ↗</a>
+      <button class="btn" data-action="fly">Konuma git</button>
+    </div>
+    <div class="d-source">Kaynak: NASA FIRMS (Fire Information for Resource Management System) · MODIS Collection 6.1 NRT</div>
+  `;
+}
+
+export function renderEvent(e: NaturalEvent): string {
+  const color = eventColor(e.category);
+  const moving = e.track.length > 1;
+  const magnitude =
+    e.magnitude !== null
+      ? e.magnitudeUnit === 'kts'
+        ? `${num(e.magnitude)} kt · ${num(e.magnitude * 1.852)} km/s`
+        : e.magnitudeUnit === 'NM^2'
+          ? `${num(e.magnitude, 1)} NM² · ${num(e.magnitude * 3.43)} km²`
+          : `${num(e.magnitude, 1)} ${escapeHtml(e.magnitudeUnit ?? '')}`
+      : null;
+  const sources = e.sources
+    .map((s) => `<a class="btn" href="${escapeHtml(s.url)}" target="_blank" rel="noopener">${escapeHtml(s.id)} ↗</a>`)
+    .join('');
+  return `
+    <div class="d-kind" style="color:${color}"><i style="background:${color}"></i>${EVENT_CATEGORIES[e.category]} · NASA EONET</div>
+    <h2 class="d-title">${escapeHtml(e.title)}</h2>
+    <div class="d-sub">Son gözlem ${relativeTime(e.date)} · ${localString(e.date)}</div>
+    ${magnitude ? `<div class="d-hero"><span class="big">${magnitude.split(' · ')[0]}</span><span class="unit">${e.category === 'severeStorms' ? 'azami sürekli rüzgâr' : 'büyüklük'}</span></div>` : ''}
+    <dl class="d-grid">
+      ${cell('Enlem', formatLat(e.lat))}
+      ${cell('Boylam', formatLon(e.lon))}
+      ${magnitude ? cell('Büyüklük', magnitude, true) : ''}
+      ${cell('İlk gözlem', `${localString(e.start)} (${relativeTime(e.start)})`, true)}
+      ${moving ? cell('İz', `${e.track.length} gözlem noktası · haritada çizgi olarak gösteriliyor`, true) : ''}
+    </dl>
+    <div class="d-actions">${sources}<button class="btn" data-action="fly">Konuma git</button></div>
+    <div class="d-source">Kaynak: NASA Earth Observatory Natural Event Tracker (EONET) · ${escapeHtml(e.id)}</div>
+  `;
 }
 
 export function renderPlace(p: GeocodeResult, sun: { lat: number; lon: number }): string {

@@ -31,6 +31,30 @@ export const ORBIT_COLORS = {
   HEO: '#ff7ab6',
 } as const;
 
+/** Yangın ışınım gücü (FRP, MW) */
+export const FRP_STOPS: Stop[] = [
+  // şehir ışıklarının sarısından ayrışsın diye turuncu-kırmızı tonlar
+  { at: 0, color: '#ff8c1a', label: '< 10 MW' },
+  { at: 10, color: '#ff5e1a', label: '10–50 MW' },
+  { at: 50, color: '#ff2d2d', label: '50–200 MW' },
+  { at: 200, color: '#ff1f6e', label: '200+ MW' },
+];
+
+export const EVENT_COLORS: Record<string, string> = {
+  volcanoes: '#ff4f2e',
+  severeStorms: '#b28cff',
+  seaLakeIce: '#bfe9ff',
+  floods: '#3fa7ff',
+  landslides: '#c99a6b',
+  dustHaze: '#d9c27a',
+  snow: '#ffffff',
+  tempExtremes: '#ff8fab',
+  drought: '#e0a458',
+  default: '#9ad7a6',
+};
+
+export const eventColor = (category: string) => EVENT_COLORS[category] ?? EVENT_COLORS.default;
+
 export const PLATE_COLORS = {
   boundary: '#f4c95d',
   subduction: '#ff7a59',

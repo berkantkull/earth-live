@@ -1,5 +1,14 @@
 /** Upstream veri biçimlerinin ayrıştırıcıları — hem Node sunucusu hem tarayıcı (statik mod) kullanır. */
-import type { Aircraft, Earthquake, GeocodeResult, SatelliteTle } from './types.ts';
+import {
+  EVENT_CATEGORIES,
+  type Aircraft,
+  type Earthquake,
+  type EventCategory,
+  type Fire,
+  type GeocodeResult,
+  type NaturalEvent,
+  type SatelliteTle,
+} from './types.ts';
 
 // ---------------------------------------------------------------- USGS
 
@@ -230,4 +239,161 @@ export function unpackAircraft(p: PackedAircraft): Aircraft[] {
     lastContact: p.t - (r[13] as number),
     category: r[14] as number | null,
   }));
+}
+
+// ---------------------------------------------------------------- NASA FIRMS aktif yangınlar (MODIS, son 24 saat)
+
+export const FIRMS_URL = 'https://firms.modaps.eosdis.nasa.gov/data/active_fire/modis-c6.1/csv/MODIS_C6_1_Global_24h.csv';
+
+/**
+ * FIRMS CSV: latitude,longitude,brightness,scan,track,acq_date,acq_time,satellite,confidence,version,bright_t31,frp,daynight
+ * Sütunlar başlıktan okunur; sıralama değişse de çalışır.
+ */
+export function parseFirmsCsv(text: string): Fire[] {
+  const lines = text.split(/\r?\n/);
+  const head = lines[0]?.split(',') ?? [];
+  const col = (name: string) => head.indexOf(name);
+  const iLat = col('latitude');
+  const iLon = col('longitude');
+  const iBright = col('brightness');
+  const iDate = col('acq_date');
+  const iTime = col('acq_time');
+  const iSat = col('satellite');
+  const iConf = col('confidence');
+  const iFrp = col('frp');
+  const iDay = col('daynight');
+  if ([iLat, iLon, iDate, iTime, iFrp].some((i) => i < 0)) return [];
+
+  const out: Fire[] = [];
+  for (let k = 1; k < lines.length; k++) {
+    const c = lines[k].split(',');
+    if (c.length < head.length) continue;
+    const lat = Number(c[iLat]);
+    const lon = Number(c[iLon]);
+    if (!Number.isFinite(lat) || !Number.isFinite(lon)) continue;
+    const hhmm = c[iTime].padStart(4, '0');
+    const time = Date.parse(`${c[iDate]}T${hhmm.slice(0, 2)}:${hhmm.slice(2)}:00Z`);
+    out.push({
+      lat,
+      lon,
+      frp: Number(c[iFrp]) || 0,
+      brightness: Number(c[iBright]) || 0,
+      confidence: Number(c[iConf]) || 0,
+      time: Number.isFinite(time) ? time : 0,
+      satellite: c[iSat] === 'T' ? 'Terra' : 'Aqua',
+      day: c[iDay] === 'D',
+    });
+  }
+  return out;
+}
+
+/** Statik mod veri dosyası için sıkı biçim: [enlem, boylam, FRP, parlaklık, güven, Δzaman(dk), uydu(0 Aqua/1 Terra), gündüz(0/1)] */
+export interface PackedFires {
+  v: 1;
+  /** en yeni tespit, unix ms */
+  t: number;
+  rows: number[][];
+}
+
+export function packFires(fires: Fire[]): PackedFires {
+  const t = fires.reduce((m, f) => Math.max(m, f.time), 0);
+  return {
+    v: 1,
+    t,
+    rows: fires.map((f) => [
+      Math.round(f.lat * 1000) / 1000,
+      Math.round(f.lon * 1000) / 1000,
+      Math.round(f.frp * 10) / 10,
+      Math.round(f.brightness),
+      f.confidence,
+      Math.round((t - f.time) / 60000),
+      f.satellite === 'Terra' ? 1 : 0,
+      f.day ? 1 : 0,
+    ]),
+  };
+}
+
+export function unpackFires(p: PackedFires): Fire[] {
+  return p.rows.map((r) => ({
+    lat: r[0],
+    lon: r[1],
+    frp: r[2],
+    brightness: r[3],
+    confidence: r[4],
+    time: p.t - r[5] * 60000,
+    satellite: r[6] === 1 ? 'Terra' : 'Aqua',
+    day: r[7] === 1,
+  }));
+}
+
+// ---------------------------------------------------------------- NASA EONET doğal olaylar
+
+/** Yangınlar FIRMS katmanından geldiği için EONET'ten diğer kategoriler istenir */
+export const EONET_URL =
+  'https://eonet.gsfc.nasa.gov/api/v3/events?status=open&category=volcanoes,severeStorms,seaLakeIce,floods,landslides,dustHaze,snow,tempExtremes,drought,manmade,waterColor';
+
+interface EonetGeometry {
+  date: string;
+  type: string;
+  coordinates: unknown;
+  magnitudeValue?: number | null;
+  magnitudeUnit?: string | null;
+}
+
+interface EonetEvent {
+  id: string;
+  title: string;
+  link: string;
+  categories: { id: string }[];
+  sources?: { id: string; url: string }[];
+  geometry: EonetGeometry[];
+}
+
+/** Nokta için koordinat, çokgen için ilk halkanın ağırlık merkezi */
+function geometryPoint(g: EonetGeometry): [number, number] | null {
+  if (g.type === 'Point') {
+    const [lon, lat] = g.coordinates as [number, number];
+    return Number.isFinite(lat) && Number.isFinite(lon) ? [lat, lon] : null;
+  }
+  if (g.type === 'Polygon') {
+    const ring = (g.coordinates as [number, number][][])[0] ?? [];
+    if (!ring.length) return null;
+    const lat = ring.reduce((s, p) => s + p[1], 0) / ring.length;
+    const lon = ring.reduce((s, p) => s + p[0], 0) / ring.length;
+    return [lat, lon];
+  }
+  return null;
+}
+
+export function parseEonet(json: { events?: EonetEvent[] }): NaturalEvent[] {
+  const out: NaturalEvent[] = [];
+  for (const e of json.events ?? []) {
+    const cat = e.categories[0]?.id;
+    if (!cat || !(cat in EVENT_CATEGORIES)) continue;
+    const track: [number, number, number][] = [];
+    for (const g of e.geometry ?? []) {
+      const p = geometryPoint(g);
+      const t = Date.parse(g.date);
+      if (p && Number.isFinite(t)) track.push([p[0], p[1], t]);
+    }
+    if (!track.length) continue;
+    track.sort((a, b) => a[2] - b[2]);
+    const last = track[track.length - 1];
+    const lastGeom = [...e.geometry].reverse().find((g) => g.magnitudeValue != null);
+    out.push({
+      id: e.id,
+      title: e.title,
+      category: cat as EventCategory,
+      lat: last[0],
+      lon: last[1],
+      date: last[2],
+      start: track[0][2],
+      magnitude: lastGeom?.magnitudeValue ?? null,
+      magnitudeUnit: lastGeom?.magnitudeUnit ?? null,
+      track,
+      sources: e.sources ?? [],
+      link: e.link,
+    });
+  }
+  return out.sort((a, b) => b.date - a.date);
 }

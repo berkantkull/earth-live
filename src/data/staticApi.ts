@@ -7,14 +7,18 @@
  */
 import {
   celestrakUrl,
+  EONET_URL,
   geocodeUrl,
   GEOCODE_URL,
+  parseEonet,
   parseGeocode,
   parseTle,
   parseUsgs,
   unpackAircraft,
+  unpackFires,
   usgsFeedUrl,
   type PackedAircraft,
+  type PackedFires,
 } from '../lib/parsers.ts';
 import {
   QUAKE_FEEDS,
@@ -22,7 +26,9 @@ import {
   type ApiEnvelope,
   type Aircraft,
   type Earthquake,
+  type Fire,
   type GeocodeResult,
+  type NaturalEvent,
   type SatelliteTle,
   type SourceMetaDto,
 } from '../lib/types.ts';
@@ -128,6 +134,20 @@ async function satellites(group: string): Promise<ApiEnvelope<SatelliteTle[]>> {
   return { ...env, provider: 'celestrak' };
 }
 
+/** NASA FIRMS tarayıcıya izin vermez: Actions'ın hazırladığı anlık görüntü */
+async function fires(): Promise<ApiEnvelope<Fire[]>> {
+  if (!DATA_URL || DATA_URL === '/') throw new StaticApiError('Yangın veri adresi (VITE_DATA_URL) tanımlı değil', 0);
+  const env = (await (await request(`${DATA_URL}fires.json`)).json()) as ApiEnvelope<PackedFires>;
+  return { ...env, data: unpackFires(env.data) };
+}
+
+/** NASA EONET CORS'a izin verir: doğrudan */
+async function events(): Promise<ApiEnvelope<NaturalEvent[]>> {
+  return direct('events', 'NASA EONET — doğal olaylar', EONET_URL, 1800, async () =>
+    parseEonet(await (await request(EONET_URL)).json()),
+  );
+}
+
 async function geocode(q: string, signal?: AbortSignal): Promise<ApiEnvelope<GeocodeResult[]>> {
   return direct('geocode', 'Open-Meteo Geocoding (GeoNames)', GEOCODE_URL, 86400, async () =>
     parseGeocode(await (await request(geocodeUrl(q, 'tr'), signal)).json()),
@@ -148,4 +168,4 @@ async function status(): Promise<DataStatus> {
   return { time: Date.now(), openskyAuthenticated: remote?.openskyAuthenticated ?? false, sources };
 }
 
-export const staticApi = { earthquakes, aircraft, satellites, geocode, status };
+export const staticApi = { earthquakes, aircraft, satellites, fires, events, geocode, status };

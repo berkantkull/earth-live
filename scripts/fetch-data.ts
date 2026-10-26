@@ -11,9 +11,10 @@
  */
 import { mkdir, readFile, stat, writeFile } from 'node:fs/promises';
 import { join } from 'node:path';
-import { celestrakUrl, OPENSKY_STATES_URL, packAircraft, SATNOGS_TLE_URL } from '../src/lib/parsers.ts';
+import { celestrakUrl, FIRMS_URL, OPENSKY_STATES_URL, packAircraft, packFires, SATNOGS_TLE_URL } from '../src/lib/parsers.ts';
 import { SATELLITE_GROUPS, type ApiEnvelope, type SourceMetaDto } from '../src/lib/types.ts';
 import { fetchAircraft, hasOpenSkyCredentials } from '../server/sources/aircraft.ts';
+import { fetchFires } from '../server/sources/nasa.ts';
 import { fetchCelestrak, fetchSatnogs, SATELLITE_TTL_SECONDS } from '../server/sources/satellites.ts';
 
 const out = process.argv[2];
@@ -67,6 +68,26 @@ const sources = new Map<string, SourceMetaDto>((prevStatus?.sources ?? []).map((
     const prev = sources.get(id);
     sources.set(id, meta({ ...base, ...prev, status: prev?.fetchedAt ? 'stale' : 'error', error: (err as Error).message, lastAttemptAt: Date.now() }));
     console.warn(`uçaklar alınamadı: ${(err as Error).message}`);
+  }
+}
+
+// ---------------------------------------------------------------- aktif yangınlar (NASA FIRMS)
+{
+  const id = 'fires';
+  const FIRES_INTERVAL_S = 30 * 60;
+  const base = { id, name: 'NASA FIRMS — MODIS aktif yangınlar (24 saat)', url: FIRMS_URL, ttlSeconds: FIRES_INTERVAL_S };
+  if ((await ageSeconds('fires.json')) >= FIRES_INTERVAL_S) {
+    try {
+      const fires = await fetchFires();
+      const m = meta({ ...base, fetchedAt: Date.now(), count: fires.length, nextRefreshAt: Date.now() + FIRES_INTERVAL_S * 1000 });
+      await write('fires.json', { data: packFires(fires), meta: m } satisfies ApiEnvelope<unknown>);
+      sources.set(id, m);
+      console.log(`yangınlar: ${fires.length}`);
+    } catch (err) {
+      const prev = sources.get(id);
+      sources.set(id, meta({ ...base, ...prev, status: prev?.fetchedAt ? 'stale' : 'error', error: (err as Error).message, lastAttemptAt: Date.now() }));
+      console.warn(`yangınlar alınamadı: ${(err as Error).message}`);
+    }
   }
 }
 

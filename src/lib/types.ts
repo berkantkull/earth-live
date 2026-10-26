@@ -61,6 +61,60 @@ export interface GeocodeResult {
   timezone: string | null;
 }
 
+/** NASA FIRMS aktif yangın tespiti (MODIS) */
+export interface Fire {
+  lat: number;
+  lon: number;
+  /** ateş ışınım gücü (Fire Radiative Power), MW */
+  frp: number;
+  /** parlaklık sıcaklığı, kelvin (kanal 21/22) */
+  brightness: number;
+  /** tespit güveni, % */
+  confidence: number;
+  /** unix ms */
+  time: number;
+  satellite: 'Aqua' | 'Terra';
+  day: boolean;
+}
+
+export const EVENT_CATEGORIES = {
+  volcanoes: 'Volkan',
+  severeStorms: 'Şiddetli fırtına',
+  seaLakeIce: 'Deniz ve göl buzu',
+  floods: 'Sel',
+  landslides: 'Heyelan',
+  dustHaze: 'Toz ve pus',
+  snow: 'Kar',
+  tempExtremes: 'Aşırı sıcaklık',
+  drought: 'Kuraklık',
+  earthquakes: 'Deprem',
+  manmade: 'İnsan kaynaklı',
+  waterColor: 'Su rengi',
+  wildfires: 'Orman yangını',
+} as const;
+
+export type EventCategory = keyof typeof EVENT_CATEGORIES;
+
+/** NASA EONET doğal olayı */
+export interface NaturalEvent {
+  id: string;
+  title: string;
+  category: EventCategory;
+  /** son bilinen konum */
+  lat: number;
+  lon: number;
+  /** son gözlem zamanı, unix ms */
+  date: number;
+  /** ilk gözlem zamanı, unix ms */
+  start: number;
+  magnitude: number | null;
+  magnitudeUnit: string | null;
+  /** fırtına gibi hareket eden olayların izi: [enlem, boylam, zaman(ms)] */
+  track: [number, number, number][];
+  sources: { id: string; url: string }[];
+  link: string;
+}
+
 export type SourceStatus = 'idle' | 'ok' | 'stale' | 'error';
 
 export interface SourceMetaDto {

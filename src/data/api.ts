@@ -1,4 +1,13 @@
-import type { ApiEnvelope, Aircraft, Earthquake, GeocodeResult, SatelliteTle, SourceMetaDto } from '../lib/types.ts';
+import type {
+  ApiEnvelope,
+  Aircraft,
+  Earthquake,
+  Fire,
+  GeocodeResult,
+  NaturalEvent,
+  SatelliteTle,
+  SourceMetaDto,
+} from '../lib/types.ts';
 import { staticApi } from './staticApi.ts';
 
 export class ApiError extends Error {
@@ -29,6 +38,8 @@ const serverApi = {
   earthquakes: (feed: string) => getJson<ApiEnvelope<Earthquake[]>>(`/api/earthquakes?feed=${encodeURIComponent(feed)}`),
   aircraft: () => getJson<ApiEnvelope<Aircraft[]>>('/api/aircraft'),
   satellites: (group: string) => getJson<ApiEnvelope<SatelliteTle[]>>(`/api/satellites?group=${encodeURIComponent(group)}`),
+  fires: () => getJson<ApiEnvelope<Fire[]>>('/api/fires'),
+  events: () => getJson<ApiEnvelope<NaturalEvent[]>>('/api/events'),
   geocode: (q: string, signal?: AbortSignal) =>
     getJson<ApiEnvelope<GeocodeResult[]>>(`/api/geocode?q=${encodeURIComponent(q)}&lang=tr`, signal),
   status: () => getJson<{ time: number; openskyAuthenticated: boolean; sources: SourceMetaDto[] }>('/api/status'),

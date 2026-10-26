@@ -6,10 +6,13 @@ import {
   type Aircraft,
   type ApiEnvelope,
   type Earthquake,
+  type Fire,
   type GeocodeResult,
+  type NaturalEvent,
   type SatelliteTle,
 } from '../src/lib/types.ts';
 import type { SatelliteFetchResult } from './sources/satellites.ts';
+import { EONET_URL, fetchEvents, fetchFires, FIRMS_URL } from './sources/nasa.ts';
 import { SourceCache, UpstreamError, type SourceMeta } from './cache.ts';
 import { fetchAircraft, hasOpenSkyCredentials, OPENSKY_STATES_URL, type OpenSkyResult } from './sources/aircraft.ts';
 import { fetchEarthquakes, usgsFeedUrl } from './sources/earthquakes.ts';
@@ -21,6 +24,8 @@ export interface ApiDeps {
   fetchAircraft?: () => Promise<OpenSkyResult>;
   fetchSatellites?: (group: string) => Promise<SatelliteFetchResult>;
   geocode?: (q: string, lang: string) => Promise<GeocodeResult[]>;
+  fetchFires?: () => Promise<Fire[]>;
+  fetchEvents?: () => Promise<NaturalEvent[]>;
   aircraftTtlSeconds?: number;
 }
 
@@ -65,6 +70,25 @@ export function createApiHandler(deps: ApiDeps = {}): Handler {
     ttlSeconds: aircraftTtl,
     fetcher: getAircraft,
     count: (d) => d.aircraft.length,
+  });
+
+  const firesCache = new SourceCache<Fire[]>({
+    id: 'fires',
+    name: 'NASA FIRMS — MODIS aktif yangınlar (24 saat)',
+    url: FIRMS_URL,
+    // FIRMS dosyası yaklaşık 3 saatte bir güncellenir
+    ttlSeconds: 30 * 60,
+    fetcher: deps.fetchFires ?? fetchFires,
+    count: (d) => d.length,
+  });
+
+  const eventsCache = new SourceCache<NaturalEvent[]>({
+    id: 'events',
+    name: 'NASA EONET — doğal olaylar',
+    url: EONET_URL,
+    ttlSeconds: 30 * 60,
+    fetcher: deps.fetchEvents ?? fetchEvents,
+    count: (d) => d.length,
   });
 
   const quakeCache = (feed: string) => {
@@ -154,6 +178,16 @@ export function createApiHandler(deps: ApiDeps = {}): Handler {
           );
         }
 
+        case '/api/fires': {
+          const { data, meta } = await firesCache.get();
+          return send(req, res, 200, { data, meta } satisfies ApiEnvelope<Fire[]>, 300);
+        }
+
+        case '/api/events': {
+          const { data, meta } = await eventsCache.get();
+          return send(req, res, 200, { data, meta } satisfies ApiEnvelope<NaturalEvent[]>, 300);
+        }
+
         case '/api/geocode': {
           const q = (url.searchParams.get('q') ?? '').trim();
           const lang = (url.searchParams.get('lang') ?? 'tr').slice(0, 5);
@@ -182,6 +216,8 @@ export function createApiHandler(deps: ApiDeps = {}): Handler {
             ...[...quakeCaches.values()].map((c) => c.meta),
             aircraftCache.meta,
             ...[...satCaches.values()].map((c) => c.meta),
+            firesCache.meta,
+            eventsCache.meta,
             geocodeMeta,
           ];
           return send(req, res, 200, { time: Date.now(), openskyAuthenticated: hasOpenSkyCredentials(), sources });

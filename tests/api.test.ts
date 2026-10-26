@@ -13,6 +13,15 @@ const deps = {
   geocode: vi.fn(async (q: string) => [
     { id: 1, name: q, lat: 41, lon: 29, country: 'Türkiye', countryCode: 'TR', admin1: null, population: null, elevation: null, timezone: 'Europe/Istanbul' },
   ]),
+  fetchFires: vi.fn(async () => [
+    { lat: 37.1, lon: 29, frp: 120, brightness: 345, confidence: 95, time: 1_760_000_000_000, satellite: 'Terra' as const, day: true },
+  ]),
+  fetchEvents: vi.fn(async () => [
+    {
+      id: 'EONET_2', title: 'Etna', category: 'volcanoes' as const, lat: 37.75, lon: 14.99, date: 1, start: 1,
+      magnitude: null, magnitudeUnit: null, track: [[37.75, 14.99, 1]] as [number, number, number][], sources: [], link: '',
+    },
+  ]),
   aircraftTtlSeconds: 60,
 };
 
@@ -113,6 +122,16 @@ describe('API', () => {
     expect(res.headers.get('content-encoding')).toBe('gzip');
     expect((await res.json()).data).toHaveLength(50);
     await new Promise<void>((r) => s.close(() => r()));
+  });
+
+  it('/api/fires ve /api/events NASA verisini önbellekli döner', async () => {
+    const f = await get('/api/fires');
+    await get('/api/fires');
+    expect(f.body.data[0]).toMatchObject({ frp: 120, satellite: 'Terra' });
+    expect(f.body.meta).toMatchObject({ id: 'fires', status: 'ok', count: 1 });
+    expect(deps.fetchFires).toHaveBeenCalledTimes(1);
+    const e = await get('/api/events');
+    expect(e.body.data[0]).toMatchObject({ title: 'Etna', category: 'volcanoes' });
   });
 
   it('bilinmeyen yol 404', async () => {

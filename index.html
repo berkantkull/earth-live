@@ -164,6 +164,32 @@
           <footer class="layer-status" id="status-plates">Bekleniyor…</footer>
         </section>
 
+        <section class="layer-card" data-layer="fires">
+          <header>
+            <span class="layer-icon fires" aria-hidden="true"></span>
+            <div class="layer-name">
+              <strong>Aktif yangınlar</strong>
+              <small>NASA FIRMS · MODIS 24 sa</small>
+            </div>
+            <span class="layer-count" id="count-fires">—</span>
+            <label class="switch"><input type="checkbox" id="toggle-fires" checked /><span></span><em class="sr">Aktif yangınlar</em></label>
+          </header>
+          <footer class="layer-status" id="status-fires">Bekleniyor…</footer>
+        </section>
+
+        <section class="layer-card" data-layer="events">
+          <header>
+            <span class="layer-icon events" aria-hidden="true"></span>
+            <div class="layer-name">
+              <strong>Doğal olaylar</strong>
+              <small>NASA EONET · volkan, fırtına, buz</small>
+            </div>
+            <span class="layer-count" id="count-events">—</span>
+            <label class="switch"><input type="checkbox" id="toggle-events" checked /><span></span><em class="sr">Doğal olaylar</em></label>
+          </header>
+          <footer class="layer-status" id="status-events">Bekleniyor…</footer>
+        </section>
+
         <div class="panel-heading">Görünüm</div>
         <div class="view-options">
           <label class="check"><input type="checkbox" id="opt-rotate" checked /><span>Otomatik dönüş</span></label>

@@ -9,6 +9,8 @@ Gerçek Dünya gözlem verilerini fotogerçekçi bir 3B gezegen üzerinde göste
 - **Depremler** — USGS Earthquake Hazards Program GeoJSON akışları (son 1 saat → son 30 gün). Renk derinliği, boyut büyüklüğü gösterir; son 3 saatteki olaylar nabız halkasıyla işaretlenir. Detayda PAGER/tsunami bilgisi ve açığa çıkan enerji yer alır.
 - **Uçaklar** — OpenSky Network ADS-B durum vektörleri (~12 bin uçak). Konumlar, ölçüm anından itibaren hız ve rota ile ileri tahmin edilir (dead reckoning); veri yenilemeleri arasında uçaklar akıcı hareket eder.
 - **Uydular** — CelesTrak GP/TLE verisi; yörüngeler tarayıcıda, ayrı bir Web Worker içinde SGP4 ile hesaplanır. Seçilen uydu için bir periyotluk yörünge izi, canlı irtifa/hız/alt-uydu noktası ve yörünge elemanları gösterilir. CelesTrak bir grubu veremezse "tüm aktif uydular" için SatNOGS DB yedek kaynak olarak kullanılır.
+- **Aktif yangınlar** — NASA FIRMS, MODIS uydularının son 24 saatteki ~20 bin yangın tespiti; renk ve boyut ateş ışınım gücüne (FRP, MW) göre.
+- **Doğal olaylar** — NASA EONET'teki açık volkan, şiddetli fırtına, buzdağı ve diğer olaylar; fırtınaların izi haritada çizilir.
 - **Tektonik plakalar** — Bird (2003) PB2002 modelindeki 241 plaka sınırı; dalma-batma zonları ayrı renkte. Bir sınır seçilince uzunluğu ve seçili zaman aralığında sınıra 100 km içindeki depremler gösterilir.
 - **Arama** — Şehir/yer (Open-Meteo Geocoding, GeoNames), uçuş (çağrı işareti, ör. `THY`) veya uydu (ad ya da NORAD numarası, ör. `ISS`, `25544`). Kamera seçilen yere ya da nesneye uçar.
 - **Uydu geçiş tahmini** — Seçilen uydunun aranan şehir ya da cihaz konumu üzerinden önümüzdeki geçişleri: saat, en yüksek açı, doğuş/batış yönü ve çıplak gözle görünürlük (gökyüzü karanlık ve uydu Güneş ışığı alıyorsa).
@@ -23,6 +25,8 @@ Gerçek Dünya gözlem verilerini fotogerçekçi bir 3B gezegen üzerinde göste
 | Depremler, arama | Node sunucusu üzerinden, önbellekli | Tarayıcıdan doğrudan (CORS açık) |
 | Uydular | Sunucu, disk önbelleği | `data` dalındaki anlık görüntü, yoksa doğrudan CelesTrak |
 | Uçaklar | Sunucu, OpenSky | `data` dalındaki anlık görüntü (~5 dk'da bir) |
+| Aktif yangınlar | Sunucu, NASA FIRMS | `data` dalındaki anlık görüntü (~30 dk'da bir) |
+| Doğal olaylar | Sunucu, NASA EONET | Tarayıcıdan doğrudan (CORS açık) |
 
 OpenSky tarayıcıdan doğrudan erişime izin vermediği için Pages sürümünde uçak ve uydu verisi
 `.github/workflows/data.yml` iş akışıyla yaklaşık 5 dakikada bir toplanır ve `data` dalına tek commit olarak
@@ -83,6 +87,7 @@ tests/             Vitest: geometri, güneş/yörünge, ayrıştırıcılar, ön
 - USGS deprem verisi — kamu malı (U.S. Government).
 - OpenSky Network — [kullanım koşulları](https://opensky-network.org/about/terms-of-use), ticari olmayan kullanım.
 - CelesTrak GP verisi — [celestrak.org](https://celestrak.org); SatNOGS DB — CC BY-SA 4.0.
+- NASA FIRMS (MODIS C6.1 NRT) ve NASA EONET — NASA açık veri politikası; kaynak: NASA Earthdata / Earth Observatory.
 - Tektonik plaka sınırları — Bird, P. (2003), *An updated digital model of plate boundaries*, G³ 4(3), 1027; GeoJSON: [fraxen/tectonicplates](https://github.com/fraxen/tectonicplates) (ODC-By 1.0).
 - Open-Meteo Geocoding — CC BY 4.0, GeoNames verisi.
 - Dünya dokuları — [Solar System Scope](https://www.solarsystemscope.com/textures/) (CC BY 4.0, NASA Blue Marble/Black Marble türevleri); normal ve speküler haritalar three.js örnek dokularından.
