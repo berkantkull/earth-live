@@ -233,7 +233,14 @@
         <div class="sources-body" id="sources-body" hidden></div>
       </section>
 
-      <div class="legend" id="legend" data-i18n-attr="aria-label:legend.label" aria-label="Lejant"></div>
+      <section class="legend" id="legend-panel">
+        <button class="legend-toggle" id="legend-toggle" type="button" aria-expanded="false" aria-controls="legend">
+          <span class="legend-swatches" aria-hidden="true"><i></i><i></i><i></i></span>
+          <span class="panel-heading" data-i18n="legend.label">Lejant</span>
+          <svg class="chev" viewBox="0 0 24 24" aria-hidden="true"><path d="m6 15 6-6 6 6" /></svg>
+        </button>
+        <div class="legend-body" id="legend" data-i18n-attr="aria-label:legend.label" aria-label="Lejant" hidden></div>
+      </section>
 
       <section class="panel timeline" id="timeline" data-i18n-attr="aria-label:tl.label" aria-label="Deprem zaman çizelgesi" hidden>
         <button class="tl-play" id="tl-play" type="button" data-i18n-attr="aria-label:tl.play" aria-label="Oynat">

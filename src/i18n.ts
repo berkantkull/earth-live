@@ -200,6 +200,9 @@ const tr = {
   'sources.st.stale': 'Bayat veri',
   'sources.st.error': 'Hata',
   'sources.st.idle': 'Henüz istenmedi',
+  'sources.summary.ok': '{n} kaynak güncel',
+  'sources.summary.stale': '{total} kaynaktan {n} tanesi bayat',
+  'sources.summary.error': '{total} kaynaktan {n} tanesinde hata',
   'sources.note':
     'Upstream istekleri önbelleğe alınarak yapılır. OpenSky erişimi: {auth}. Uydu konumları SGP4 ile tarayıcıda hesaplanır. Plaka sınırları: Bird (2003) PB2002 (ODC-By 1.0). Dokular: Solar System Scope (CC BY 4.0), NASA Blue Marble / Black Marble türevleri.',
   'sources.auth.yes': 'kimlikli (OAuth2)',
@@ -557,6 +560,9 @@ const en: Record<Key, string> = {
   'sources.st.stale': 'Stale data',
   'sources.st.error': 'Error',
   'sources.st.idle': 'Not requested yet',
+  'sources.summary.ok': '{n} sources up to date',
+  'sources.summary.stale': '{n} of {total} sources stale',
+  'sources.summary.error': '{n} of {total} sources failing',
   'sources.note':
     'Upstream requests are cached. OpenSky access: {auth}. Satellite positions are computed in the browser with SGP4. Plate boundaries: Bird (2003) PB2002 (ODC-By 1.0). Textures: Solar System Scope (CC BY 4.0), derived from NASA Blue Marble / Black Marble.',
   'sources.auth.yes': 'authenticated (OAuth2)',

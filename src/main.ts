@@ -497,6 +497,27 @@ container.addEventListener('pointerdown', () => {
 syncLayersButton();
 
 renderLegend($('legend'));
+
+// Lejant varsayılan olarak kapalı (Dünya'yı örtmesin); açık/kapalı tercihi hatırlanır
+const LEGEND_KEY = 'earthlive.legend';
+function setLegendOpen(open: boolean) {
+  $('legend').hidden = !open;
+  $('legend-panel').classList.toggle('open', open);
+  $('legend-toggle').setAttribute('aria-expanded', String(open));
+  try {
+    localStorage.setItem(LEGEND_KEY, open ? '1' : '0');
+  } catch {
+    // kaydedilemese de çalışır
+  }
+}
+$('legend-toggle').addEventListener('click', () => setLegendOpen($('legend').hidden));
+setLegendOpen((() => {
+  try {
+    return localStorage.getItem(LEGEND_KEY) === '1';
+  } catch {
+    return false;
+  }
+})());
 $('copyright-year').textContent = String(Math.max(2026, new Date().getFullYear()));
 
 // ---------------------------------------------------------------- veri kaynakları paneli

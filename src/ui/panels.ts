@@ -44,11 +44,19 @@ export function renderSources(el: HTMLElement, sources: SourceMetaDto[], opensky
     <div class="src-note">${t('sources.note', { auth: openskyAuth ? t('sources.auth.yes') : t('sources.auth.no') })}</div>`;
 }
 
+/** Tek satırlık özet: en kötü durumun rengi + sayı (ayrıntılar panel açılınca) */
 export function renderSourcesSummary(el: HTMLElement, sources: SourceMetaDto[]) {
-  el.innerHTML = sources
-    .filter((s) => s.id !== 'geocode' || s.status !== 'idle')
-    .map((s) => `<i class="${s.status}" title="${escapeHtml(sourceName(s))}: ${statusLabel(s.status)}"></i>`)
-    .join('');
+  const active = sources.filter((s) => s.status !== 'idle');
+  const errors = active.filter((s) => s.status === 'error').length;
+  const stale = active.filter((s) => s.status === 'stale').length;
+  const [cls, text] =
+    errors > 0
+      ? ['error', t('sources.summary.error', { n: errors, total: active.length })]
+      : stale > 0
+        ? ['stale', t('sources.summary.stale', { n: stale, total: active.length })]
+        : ['ok', t('sources.summary.ok', { n: active.length })];
+  el.title = active.map((s) => `${sourceName(s)}: ${statusLabel(s.status)}`).join('\n');
+  el.innerHTML = active.length ? `<i class="${cls}"></i><span>${text}</span>` : '';
 }
 
 export function renderLegend(el: HTMLElement) {
