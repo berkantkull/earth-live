@@ -134,11 +134,15 @@ for (const k of Object.keys(SATELLITE_GROUPS)) satGroupSel.add(new Option(t(`gro
 const initialView = parseViewState(location.hash);
 if (initialView.feed) quakeFeedSel.value = initialView.feed;
 if (initialView.group) satGroupSel.value = initialView.group;
+/** Kullanıcı kamerayı oynattı mı (ya da bağlantı bir kamera konumu getirdi mi): yalnızca o zaman konum adrese yazılır */
+let cameraTouched = false;
 if (initialView.camera) {
   const { lat, lon, altKm } = initialView.camera;
   const p = latLonToVec3(lat, lon, Math.max(1.09, 1 + altKm / EARTH_RADIUS_KM));
   globe.camera.position.set(p.x, p.y, p.z);
-  globe.pauseAutoRotate(20000);
+  cameraTouched = true;
+  // yalnızca paylaşılan bir nesne varsa dönüşü bekle (kullanıcı ona bakacak); salt kamera konumunda Dünya dönmeye devam eder
+  if (initialView.selection) globe.pauseAutoRotate(20000);
 }
 /** bağlantıdaki seçim, ilgili veri gelince uygulanır */
 let pendingShared: SharedSelection | null = initialView.selection ?? null;
@@ -798,6 +802,7 @@ container.addEventListener('pointerup', (e) => {
 
 globe.controls.addEventListener('start', () => {
   following = false;
+  cameraTouched = true;
 });
 
 // ---------------------------------------------------------------- detay paneli
@@ -969,8 +974,10 @@ function renderPassSection() {
 // ---------------------------------------------------------------- paylaşma
 function currentViewState(): ViewState {
   const ll = vec3ToLatLon(globe.camera.position);
+  // kamera yalnızca kendiliğinden dönüyorsa adres temiz kalır
+  const keepCamera = cameraTouched || selection !== null || pendingShared !== null;
   const v: ViewState = {
-    camera: { lat: ll.lat, lon: ll.lon, altKm: (ll.radius - 1) * EARTH_RADIUS_KM },
+    camera: keepCamera ? { lat: ll.lat, lon: ll.lon, altKm: (ll.radius - 1) * EARTH_RADIUS_KM } : undefined,
     feed: quakeFeedSel.value as ViewState['feed'],
     group: satGroupSel.value as ViewState['group'],
     minMagnitude: Number(quakeMin.value),
@@ -988,6 +995,8 @@ function writeUrl() {
 }
 
 async function shareCurrentView() {
+  // paylaşılan bağlantı, paylaşanın o an gördüğü açıyı da içersin
+  cameraTouched = true;
   writeUrl();
   const url = location.href;
   const sel = selection?.kind === 'layer' ? selection : null;

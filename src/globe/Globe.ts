@@ -81,7 +81,7 @@ export class Globe {
     this.controls.maxDistance = MAX_DISTANCE;
     this.controls.rotateSpeed = 0.45;
     this.controls.zoomSpeed = 0.8;
-    this.controls.autoRotateSpeed = 0.15; // ≈ 6,5 dakikada bir tur
+    this.controls.autoRotateSpeed = 0.35; // ≈ 3 dakikada bir tur: fark edilir ama sakin
     this.controls.addEventListener('start', () => {
       this.fly = null;
       this.pauseAutoRotate(12000);
