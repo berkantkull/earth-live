@@ -177,8 +177,7 @@ export class Globe {
     }
 
     await Promise.allSettled([
-      this.texture('earth_clouds_2k.webp', false).then((t) => {
-        t.wrapS = THREE.RepeatWrapping;
+      this.texture('earth_clouds_2k.webp', false, true).then((t) => {
         this.swap(this.cloudMat.uniforms.cloudMap, t);
         if (this.clouds.visible) u.cloudMap.value = t;
       }),
@@ -196,9 +195,11 @@ export class Globe {
     this.hiResReady = true;
   }
 
-  private async texture(name: string, srgb: boolean): Promise<THREE.Texture> {
+  /** repeatX: yatayda tekrarlı sarma (kayan bulutlar için); GPU'ya yüklemeden önce ayarlanmalı */
+  private async texture(name: string, srgb: boolean, repeatX = false): Promise<THREE.Texture> {
     const t = await loadTexture(TEX + name, srgb);
     t.anisotropy = this.maxAniso;
+    if (repeatX) t.wrapS = THREE.RepeatWrapping;
     // GPU'ya yüklemeyi şimdi yap: ilk kullanıldığı karede takılma olmasın
     this.renderer.initTexture(t);
     return t;

@@ -46,7 +46,9 @@ export const earthFragment = /* glsl */ `
     float ocean = texture2D(specMap, vUv).r;
 
     // bulut gölgesi (Güneş yönünde hafif kaydırılmış)
-    vec2 cuv = vec2(fract(vUv.x + cloudOffset), vUv.y);
+    // fract() kullanılmaz: sarma noktasında türev sıçrar, mipmap seçimi bozulur ve ince bir dikey çizgi çıkar.
+    // Doku RepeatWrapping ile yüklendiği için sarmayı doku birimi kesintisiz yapar.
+    vec2 cuv = vec2(vUv.x + cloudOffset, vUv.y);
     float cloudShadow = texture2D(cloudMap, cuv).r;
 
     vec3 color = day * (0.025 + diffuse * 1.15) * (1.0 - cloudShadow * 0.35);
@@ -87,7 +89,7 @@ export const cloudFragment = /* glsl */ `
   void main() {
     vec3 n = normalize(vNormal);
     vec3 L = realLighting > 0.5 ? normalize(sunDir) : normalize(cameraPosition);
-    float a = texture2D(cloudMap, vec2(fract(vUv.x + cloudOffset), vUv.y)).r;
+    float a = texture2D(cloudMap, vec2(vUv.x + cloudOffset, vUv.y)).r;
     a = smoothstep(0.08, 0.9, a);
     float light = smoothstep(-0.15, 0.35, dot(n, L));
     vec3 col = vec3(1.0) * (0.04 + light * 0.96);
