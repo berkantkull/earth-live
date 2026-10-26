@@ -7,7 +7,7 @@
  *  - Canlı veri (deprem, uçak, uydu, yangın, olay): önce ağ, yoksa son kaydedilen veri
  *  - Konum araması ve diğer her şey: yalnızca ağ
  */
-const VERSION = 'v1';
+const VERSION = 'v2';
 const SHELL = `earthlive-shell-${VERSION}`;
 const STATIC = `earthlive-static-${VERSION}`;
 const DATA = `earthlive-data-${VERSION}`;
@@ -43,7 +43,9 @@ const LIVE_DATA = [
 async function networkFirst(request, cacheName) {
   const cache = await caches.open(cacheName);
   try {
-    const res = await fetch(request);
+    // Sayfa: tarayıcı önbelleğini (Pages max-age=600) atla, sunucuya ETag ile sor —
+    // yeni sürüm yayınlanınca hemen gelir, değişmediyse yalnızca 304 döner
+    const res = request.mode === 'navigate' ? await fetch(request.url, { cache: 'no-cache', credentials: 'same-origin' }) : await fetch(request);
     if (res.ok) cache.put(request, res.clone());
     return res;
   } catch (err) {
