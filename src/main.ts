@@ -1071,5 +1071,39 @@ document.addEventListener('visibilitychange', () => {
   else pollers.forEach((p) => p.refresh());
 });
 
+// ---------------------------------------------------------------- uygulama olarak kurulum (PWA)
+if (import.meta.env.PROD && 'serviceWorker' in navigator) {
+  window.addEventListener('load', () => {
+    navigator.serviceWorker.register(`${import.meta.env.BASE_URL}sw.js`, { scope: import.meta.env.BASE_URL }).catch((err) => {
+      console.warn('Service worker kaydedilemedi', err);
+    });
+  });
+}
+
+interface InstallPromptEvent extends Event {
+  prompt(): Promise<void>;
+  userChoice: Promise<{ outcome: 'accepted' | 'dismissed' }>;
+}
+let installPrompt: InstallPromptEvent | null = null;
+const installBtn = $('install-app');
+// tarayıcı kurulumu teklif edebildiğinde düğme görünür (Chrome, Edge, Android)
+window.addEventListener('beforeinstallprompt', (e) => {
+  e.preventDefault();
+  installPrompt = e as InstallPromptEvent;
+  installBtn.hidden = false;
+});
+installBtn.addEventListener('click', async () => {
+  if (!installPrompt) return;
+  await installPrompt.prompt();
+  const { outcome } = await installPrompt.userChoice;
+  installPrompt = null;
+  installBtn.hidden = true;
+  if (outcome === 'accepted') toast($('toasts'), 'EARTH LIVE uygulama olarak yüklendi.', 'info', 4000);
+});
+window.addEventListener('appinstalled', () => {
+  installPrompt = null;
+  installBtn.hidden = true;
+});
+
 // geliştirme sırasında konsoldan inceleme için
 if (import.meta.env.DEV) Object.assign(window, { __earthlive: { globe, layers, pickAt, selectLayerItem } });

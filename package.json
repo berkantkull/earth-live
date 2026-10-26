@@ -23,7 +23,8 @@
     "test:watch": "vitest",
     "typecheck": "tsc --noEmit",
     "textures": "node scripts/build-textures.ts",
-    "plates": "node scripts/build-plates.ts"
+    "plates": "node scripts/build-plates.ts",
+    "icons": "node scripts/build-icons.ts"
   },
   "dependencies": {
     "satellite.js": "^7.1.0",

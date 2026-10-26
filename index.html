@@ -8,6 +8,12 @@
     <meta name="author" content="Berkant Kul" />
     <title>EARTH LIVE — Global Observation & Monitoring System</title>
     <link rel="icon" type="image/svg+xml" href="/favicon.svg" />
+    <link rel="manifest" href="/manifest.webmanifest" />
+    <link rel="apple-touch-icon" href="/icons/apple-touch-icon.png" />
+    <meta name="apple-mobile-web-app-capable" content="yes" />
+    <meta name="mobile-web-app-capable" content="yes" />
+    <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent" />
+    <meta name="apple-mobile-web-app-title" content="EARTH LIVE" />
     <link rel="canonical" href="%VITE_SITE_URL%" />
 
     <!-- bağlantı paylaşıldığında görünen önizleme kartı -->
@@ -71,6 +77,9 @@
         </div>
 
         <div class="topbar-right">
+          <button class="icon-btn" id="install-app" aria-label="Uygulamayı yükle" title="Uygulamayı yükle" hidden>
+            <svg viewBox="0 0 24 24"><path d="M12 4v11M7.5 10.5 12 15l4.5-4.5" /><path d="M5 19h14" /></svg>
+          </button>
           <button class="icon-btn" id="share-view" aria-label="Bu görünümü paylaş" title="Bu görünümü paylaş">
             <svg viewBox="0 0 24 24"><circle cx="18" cy="5" r="2.5" /><circle cx="6" cy="12" r="2.5" /><circle cx="18" cy="19" r="2.5" /><path d="m8.2 10.8 7.6-4.5M8.2 13.2l7.6 4.5" /></svg>
           </button>

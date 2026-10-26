@@ -15,6 +15,7 @@ Gerçek Dünya gözlem verilerini fotogerçekçi bir 3B gezegen üzerinde göste
 - **Tektonik plakalar** — Bird (2003) PB2002 modelindeki 241 plaka sınırı; dalma-batma zonları ayrı renkte. Bir sınır seçilince uzunluğu ve seçili zaman aralığında sınıra 100 km içindeki depremler gösterilir.
 - **Arama** — Şehir/yer (Open-Meteo Geocoding, GeoNames), uçuş (çağrı işareti, ör. `THY`) veya uydu (ad ya da NORAD numarası, ör. `ISS`, `25544`). Kamera seçilen yere ya da nesneye uçar.
 - **Uydu geçiş tahmini** — Seçilen uydunun aranan şehir ya da cihaz konumu üzerinden önümüzdeki geçişleri: saat, en yüksek açı, doğuş/batış yönü ve çıplak gözle görünürlük (gökyüzü karanlık ve uydu Güneş ışığı alıyorsa).
+- **Uygulama olarak kurulum (PWA)** — Telefona ve bilgisayara uygulama gibi yüklenebilir; service worker sayesinde ikinci açılış önbellekten anında gelir, internet yokken son kaydedilen verilerle açılır.
 - **Paylaşılabilir bağlantılar** — Kamera, seçili nesne ve filtreler adres çubuğunda tutulur (`#c=…&s=…`); bağlantıyı açan kişi aynı görünümü görür. Bağlantı paylaşıldığında önizleme kartı çıkar.
 - **Gerçek aydınlatma** — Güneş-altı noktası astronomik formüllerle hesaplanır; gece/gündüz sınırı, şehir ışıkları, okyanus parlaması, bulut gölgeleri ve atmosfer gerçek zamana göre çizilir.
 - **Veri kaynakları paneli** — her kaynağın durumu, son güncelleme, sonraki yenileme, öğe sayısı ve hata mesajları.
