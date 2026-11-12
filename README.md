@@ -1,6 +1,6 @@
 # EARTH LIVE — Global Observation & Monitoring System
 
-Gerçek Dünya gözlem verilerini fotogerçekçi bir 3B gezegen üzerinde gösteren bilimsel izleme arayüzü.
+Deprem, uçuş ve uydu verilerini 3B dünya üzerinde birlikte gösteren tarayıcı tabanlı izleme uygulaması.
 
 **Canlı:** https://berkantkull.github.io/earth-live/
 
